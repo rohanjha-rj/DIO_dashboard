@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bhagalpur — Health Facility & HSC Dashboard</title>
+
+  <!-- Typography & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  
+  <!-- Client-side CSV/Excel parsing CDNs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+
+
+  <link rel="stylesheet" href="css/dashboard.css">
+
+<body>
+
+  <div class="d">
+    <h2 class="sr-only">Bhagalpur Health Facility & HSC Immunization Dashboard — April 2026</h2>
+
+    <!-- Premium Header -->
+    <div class="hdr">
+      <div>
+        <h1>Bhagalpur — Immunization Dashboard</h1>
+        <p><i class="ti ti-map-pin" style="margin-right: 4px; vertical-align: middle;"></i>Bhagalpur District &nbsp;·&nbsp;
+          <i class="ti ti-calendar" style="margin-right: 4px; margin-left: 8px; vertical-align: middle;"></i>April 2026
+          &nbsp;·&nbsp; <i class="ti ti-chart-bar"
+            style="margin-right: 4px; margin-left: 8px; vertical-align: middle;"></i>Session site coverage data</p>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <div class="tab-bar" style="margin: 0; background: var(--color-border-primary); padding: 4px; border-radius: var(--border-radius-md); border: 1px solid var(--color-border-secondary);">
+          <button class="tb on" id="btn-lvl-facility" onclick="changeViewLevel('facility')" style="border: none; margin: 0; padding: 6px 12px;"><i class="ti ti-building"></i> Facility Level</button>
+          <button class="tb" id="btn-lvl-hsc" onclick="changeViewLevel('hsc')" style="border: none; margin: 0; padding: 6px 12px;"><i class="ti ti-home-2"></i> Sub-Centre (HSC) Level</button>
+        </div>
+        <span class="badge">U-WIN · BHAGALPUR</span>
+      </div>
+    </div>
+
+    <!-- Upload Card -->
+    <div class="upload-card" id="drop-zone">
+      <i class="ti ti-cloud-upload upload-icon"></i>
+      <div class="upload-title">Dynamic U-WIN Report Uploader</div>
+      <div class="upload-sub">Drag and drop your U-WIN "Session Site wise Coverage Report" CSV or Excel (.xlsx) file here, or click to browse.</div>
+      <input type="file" id="file-input" accept=".csv, .xlsx, .xls" style="display:none">
+      <div style="display:flex; justify-content:center; gap:12px; align-items:center;">
+        <button class="tb on" onclick="document.getElementById('file-input').click()"><i class="ti ti-file-upload"></i> Browse Files</button>
+        <button class="tb" id="btn-reset-data" onclick="resetToDefaultData()" style="display:none;"><i class="ti ti-refresh"></i> Reset to Default Data</button>
+      </div>
+      <div id="upload-status" style="margin-top:12px; font-weight:600; font-size:12px; color:var(--color-primary);">Using default April 2026 dataset</div>
+    </div>
+
+
+
+    <div class="sec-lbl">District summary — April 2026</div>
+    <div class="kpis" id="kpi-row"></div>
+
+    <!-- Alert Banner -->
+    <div class="alert">
+      <i class="ti ti-info-circle" aria-hidden="true" style="font-size: 20px; flex-shrink: 0;"></i>
+      <span><strong>Attention:</strong> 8 facilities (APHC/HSC) have no sessions recorded in this period — shown
+        separately in the table. Facilities where Penta-3 &gt; Penta-1 indicate beneficiary inflow from neighbouring
+        areas.</span>
+    </div>
+
+    <!-- Performance Table Card -->
+    <div class="card">
+      <div
+        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px">
+        <div class="card-ttl" style="margin:0"><i class="ti ti-table"
+            style="margin-right:6px; vertical-align:middle;"></i>Performance table</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <div class="export-group">
+            <button class="tb" onclick="exportTableToCSV()"><i class="ti ti-file-spreadsheet"></i> Export CSV</button>
+            <button class="tb" onclick="window.print()"><i class="ti ti-printer"></i> Export PDF</button>
+          </div>
+          <div class="tab-bar" style="margin:0">
+            <button class="tb on" onclick="setView('active')">Active</button>
+            <button class="tb" onclick="setView('all')">All</button>
+            <button class="tb" onclick="setView('inactive')">No sessions</button>
+          </div>
+        </div>
+      </div>
+      <div class="frow">
+        <input type="text" id="search" placeholder="Search facility, HSC or block..." oninput="renderTable()">
+        <select id="block-filter" onchange="renderTable()">
+          <option value="">All blocks</option>
+        </select>
+        <select id="sort-col" onchange="renderTable()">
+          <option value="penta1">Sort: Penta-1 ↓</option>
+          <option value="sessions_held">Sort: Sessions held</option>
+          <option value="bcg">Sort: BCG ↓</option>
+          <option value="dropout_penta">Sort: Dropout ↓</option>
+          <option value="avg_per_session">Sort: Avg / session</option>
+          <option value="total_beneficiaries">Sort: Total beneficiaries</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="fac-table">
+          <thead>
+            <tr>
+              <th onclick="sortBy('facility')" id="facility-header">Facility</th>
+              <th onclick="sortBy('sub_district')">Block</th>
+              <th onclick="sortBy('sites')">Sites</th>
+              <th onclick="sortBy('sessions_held')">Sessions</th>
+              <th onclick="sortBy('session_pct')">% Held</th>
+              <th onclick="sortBy('avg_per_session')">Avg/session</th>
+              <th onclick="sortBy('penta1')">Penta-1</th>
+              <th onclick="sortBy('penta3')">Penta-3</th>
+              <th onclick="sortBy('bcg')">BCG</th>
+              <th onclick="sortBy('mr1')">MR-1</th>
+              <th onclick="sortBy('mr2')">MR-2</th>
+              <th onclick="sortBy('dropout_penta')">P1→P3 dropout</th>
+              <th onclick="sortBy('dropout_mr')">MR dropout</th>
+              <th>Grade</th>
+            </tr>
+          </thead>
+          <tbody id="fac-body"></tbody>
+        </table>
+      </div>
+      <div id="tbl-count" style="font-size:12px; color:var(--color-text-tertiary); margin-top:12px; font-weight:600;">
+      </div>
+    </div>
+
+    <!-- Performance Charts Group 1 -->
+    <div class="charts2">
+      <div class="card" style="margin:0">
+        <div class="card-ttl" id="chart-penta-title"><i class="ti ti-chart-bar"
+            style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Penta-1 coverage (top 16 active)</div>
+        <div class="lgd">
+          <span><span class="ld" style="background:#2563eb"></span>Penta-1</span>
+          <span><span class="ld" style="background:#10b981"></span>Penta-3</span>
+        </div>
+        <div style="position:relative; height:320px"><canvas id="c-penta" role="img"
+            aria-label="Penta chart">Penta chart</canvas></div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-ttl" id="chart-bcg-title"><i class="ti ti-chart-arrows"
+            style="margin-right:6px; vertical-align:middle; color:var(--color-warning)"></i>BCG vs Penta-1 — coverage
+          gap analysis</div>
+        <div class="lgd">
+          <span><span class="ld" style="background:#f59e0b"></span>BCG</span>
+          <span><span class="ld" style="background:#2563eb"></span>Penta-1</span>
+          <span style="color:var(--color-text-tertiary); font-size:11px; margin-left:auto;">BCG–Penta gap flags
+            zero-dose risk</span>
+        </div>
+        <div style="position:relative; height:320px"><canvas id="c-bcg" role="img"
+            aria-label="BCG chart">BCG chart</canvas></div>
+      </div>
+    </div>
+
+    <!-- Performance Charts Group 2 -->
+    <div class="charts2">
+      <div class="card" style="margin:0">
+        <div class="card-ttl" id="chart-dropout-title"><i class="ti ti-chart-area"
+            style="margin-right:6px; vertical-align:middle; color:var(--color-danger)"></i>Dropout — Penta-1 → Penta-3 (active)</div>
+        <div class="lgd">
+          <span><span class="ld" style="background:#ef4444"></span>&gt;10% loss</span>
+          <span><span class="ld" style="background:#f59e0b"></span>0–10%</span>
+          <span><span class="ld" style="background:#10b981"></span>Inflow (&lt;0)</span>
+        </div>
+        <div style="position:relative; height:320px"><canvas id="c-dropout" role="img"
+            aria-label="Dropout chart">Dropout chart</canvas></div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-ttl" id="chart-load-title"><i class="ti ti-chart-line"
+            style="margin-right:6px; vertical-align:middle; color:#6366f1"></i>Session load — avg beneficiaries per
+          session</div>
+        <div class="lgd">
+          <span><span class="ld" style="background:#6366f1"></span>Avg/session</span>
+          <span style="color:var(--color-text-tertiary); font-size:11px; margin-left:auto;" id="district-avg-label">District avg: 13.9</span>
+        </div>
+        <div style="position:relative; height:320px"><canvas id="c-load" role="img"
+            aria-label="Load chart">Load chart</canvas></div>
+      </div>
+    </div>
+
+    <!-- Facility Scorecard section -->
+    <div class="card">
+      <div
+        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px">
+        <div class="card-ttl" style="margin:0"><i class="ti ti-grid-pattern"
+            style="margin-right:6px; vertical-align:middle;"></i>Composite performance scorecards (active)</div>
+        <div class="tab-bar" id="grade-tabs" style="margin:0">
+          <button class="tb on" onclick="filterGrade('all')">All</button>
+          <button class="tb" onclick="filterGrade('A')">Grade A</button>
+          <button class="tb" onclick="filterGrade('B')">Grade B</button>
+          <button class="tb" onclick="filterGrade('C')">Grade C</button>
+          <button class="tb" onclick="filterGrade('D')">Grade D</button>
+        </div>
+      </div>
+      <div id="scorecard-container" class="scorecard-grid"></div>
+    </div>
+
+    <div class="footer">
+      <p><strong>Data Source:</strong> <span id="footer-data-source">Session Site Coverage Report · Apr 2026 · Bhagalpur, Bihar</span> &nbsp;|&nbsp;
+        <strong>Notes:</strong> Dropout &lt;0 = beneficiary inflow from outside (P3&gt;P1); Grade = composite of session
+        %, avg load, and Penta-1 volume</p>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
+  <script src="js/data.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
