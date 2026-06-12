@@ -179,7 +179,7 @@
       const q = document.getElementById('search').value.trim();
 
       let locationStr = "Bhagalpur District";
-      let titleStr = "Bhagalpur — Immunization Dashboard";
+      let titleStr = "Bhagalpur — Routine Immunization Dashboard";
 
       if (q) {
         const matchedItems = currentDataset.filter(f => {
@@ -198,7 +198,7 @@
       }
 
       // Update browser tab/window and PDF header
-      document.title = `${locationStr} — Immunization Report (${currentReportDate})`;
+      document.title = `${locationStr} — Routine Immunization Report (${currentReportDate})`;
 
       // Update header elements in DOM
       const locEl = document.getElementById('location-text');
@@ -211,7 +211,7 @@
         } else if (blk) {
           mainTitleEl.textContent = "Block Immunization Report";
         } else {
-          mainTitleEl.textContent = "Bhagalpur — Immunization Dashboard";
+          mainTitleEl.textContent = "Bhagalpur — Routine Immunization Dashboard";
         }
       }
     }
@@ -224,7 +224,7 @@
       if (calEl) calEl.textContent = dateStr;
       
       const srTitleEl = document.getElementById('sr-header-title');
-      if (srTitleEl) srTitleEl.textContent = `Bhagalpur Health Facility & HSC Immunization Dashboard — ${dateStr}`;
+      if (srTitleEl) srTitleEl.textContent = `Bhagalpur Health Facility & HSC Routine Immunization Dashboard — ${dateStr}`;
       
       const distTitleEl = document.getElementById('district-summary-title');
       if (distTitleEl) distTitleEl.textContent = `District summary — ${dateStr}`;
@@ -507,7 +507,7 @@
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Immunization_Dashboard_Report_${curLevel}_${curView}.csv`);
+      link.setAttribute("download", `Routine_Immunization_Dashboard_Report_${curLevel}_${curView}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

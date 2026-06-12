@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bhagalpur — Health Facility & HSC Dashboard</title>
+  <title>Bhagalpur — Health Facility & HSC Routine Immunization Dashboard</title>
 
   <!-- Typography & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,12 +24,12 @@
 <body>
 
   <div class="d">
-    <h2 class="sr-only" id="sr-header-title">Bhagalpur Health Facility & HSC Immunization Dashboard — April 2026</h2>
+    <h2 class="sr-only" id="sr-header-title">Bhagalpur Health Facility & HSC Routine Immunization Dashboard — April 2026</h2>
 
     <!-- Premium Header -->
     <div class="hdr">
       <div>
-        <h1 id="main-title">Bhagalpur — Immunization Dashboard</h1>
+        <h1 id="main-title">Bhagalpur — Routine Immunization Dashboard</h1>
         <p><i class="ti ti-map-pin" style="margin-right: 4px; vertical-align: middle;"></i><span
             id="location-text">Bhagalpur District</span> &nbsp;·&nbsp;
           <i class="ti ti-calendar" style="margin-right: 4px; margin-left: 8px; vertical-align: middle;"></i><span
@@ -149,7 +149,7 @@
         <button class="tb chart-dl-btn" onclick="downloadChart('c-penta', 'Antigen_coverage')"
           style="padding:4px 8px; font-size:11px; margin:0;"><i class="ti ti-download"></i> Download</button>
       </div>
-      
+
       <!-- Antigen Filter Chips -->
       <div class="antigen-filters">
         <span class="filters-lbl">Compare Antigens:</span>
@@ -182,7 +182,7 @@
       <div class="lgd" id="penta-legend">
         <!-- Will be populated dynamically by JS -->
       </div>
-      
+
       <div class="chart-outer-h">
         <div id="c-penta-wrapper" class="chart-inner-h">
           <canvas id="c-penta" role="img" aria-label="Penta chart">Penta chart</canvas>
@@ -195,17 +195,21 @@
       <div class="card" style="margin:0">
         <div
           style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-          <div class="card-ttl" id="chart-dropout-title" style="margin:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="card-ttl" id="chart-dropout-title"
+            style="margin:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <i class="ti ti-chart-area" style="margin-right:6px; vertical-align:middle; color:var(--color-danger)"></i>
             <span>Dropout —</span>
-            <select id="dropout-metric-select" onchange="onDropoutMetricChange()" style="font-family: var(--font-sans); font-size: 13px; font-weight: 600; padding: 4px 8px; border-radius: var(--border-radius-sm); border: 1px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); outline: none;">
+            <select id="dropout-metric-select" onchange="onDropoutMetricChange()"
+              style="font-family: var(--font-sans); font-size: 13px; font-weight: 600; padding: 4px 8px; border-radius: var(--border-radius-sm); border: 1px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); outline: none;">
               <option value="penta">Penta 1 to Penta 3</option>
               <option value="mr">MR 1 to MR 2</option>
             </select>
             <span class="print-show" id="print-dropout-text">Penta 1 to Penta 3</span>
-            <span id="chart-dropout-suffix" style="font-size:12px; color:var(--color-text-tertiary); font-weight:600;">(active)</span>
+            <span id="chart-dropout-suffix"
+              style="font-size:12px; color:var(--color-text-tertiary); font-weight:600;">(active)</span>
           </div>
-          <button class="tb chart-dl-btn" onclick="downloadChart('c-dropout', document.getElementById('dropout-metric-select').value === 'penta' ? 'Penta_dropout_rate' : 'MR_dropout_rate')"
+          <button class="tb chart-dl-btn"
+            onclick="downloadChart('c-dropout', document.getElementById('dropout-metric-select').value === 'penta' ? 'Penta_dropout_rate' : 'MR_dropout_rate')"
             style="padding:4px 8px; font-size:11px; margin:0;"><i class="ti ti-download"></i> Download</button>
         </div>
         <div class="lgd">
@@ -259,7 +263,7 @@
     </div>
 
     <div class="footer">
-      <p><strong>Data Source:</strong> <span id="footer-data-source">Session Site Coverage Report · Apr 2026 ·
+      <p><strong>Data Source: Uwin</strong> <span id="footer-data-source">Session Site Coverage Report · Apr 2026 ·
           Bhagalpur, Bihar</span> &nbsp;|&nbsp;
         <strong>Notes:</strong> Dropout &lt;0 = beneficiary inflow from outside (P3&gt;P1); Grade = composite of session
         %, avg load, and Penta-1 volume
