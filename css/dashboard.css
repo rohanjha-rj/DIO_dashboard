@@ -44,13 +44,35 @@
 
     /* PDF print custom styles */
     @media print {
+      @page {
+        size: landscape;
+        margin: 8mm;
+      }
+
       body {
         background: #ffffff !important;
         color: #000000 !important;
-        font-size: 11px !important;
+        font-size: 9px !important;
+        padding: 0 !important;
+        margin: 0 !important;
       }
 
-      .hdr,
+      .d {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      /* Print the header, but hide interactive elements */
+      .hdr {
+        border-bottom: 2px solid #0f172a !important;
+        margin-bottom: 20px !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+      }
+
       .alert,
       .tab-bar,
       .frow,
@@ -61,12 +83,23 @@
       .footer,
       .export-group,
       #block-filter,
-      #sort-col {
+      #sort-col,
+      .chart-dl-btn {
         display: none !important;
       }
 
-      .card,
       .charts2 {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 1.5rem !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin-bottom: 1.5rem !important;
+        page-break-inside: auto !important;
+      }
+
+      .card {
         border: none !important;
         box-shadow: none !important;
         padding: 0 !important;
@@ -74,22 +107,89 @@
         page-break-inside: avoid !important;
       }
 
+      /* Make scroll containers full size on print */
+      .chart-outer-h,
+      .chart-outer-v {
+        overflow: visible !important;
+        width: 100% !important;
+        height: auto !important;
+      }
+
+      .chart-inner-h,
+      .chart-inner-v {
+        width: 100% !important;
+        height: 320px !important;
+        min-width: 100% !important;
+        min-height: auto !important;
+      }
+
+      .chart-inner-h canvas,
+      .chart-inner-v canvas {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+      }
+
       table {
         border-collapse: collapse !important;
         width: 100% !important;
+        table-layout: auto !important;
       }
 
       th,
       td {
         border: 1px solid #cbd5e1 !important;
-        padding: 6px 8px !important;
-        font-size: 10px !important;
+        padding: 4px 3px !important;
+        font-size: 8px !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+      }
+
+      th {
+        background-color: #f8fafc !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
 
       .sc-score {
         border: 1px solid #cbd5e1 !important;
       }
+
+      /* Force background printing for key indicators */
+      .bar-f, .pill, .kpi, .badge, .sc-score {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
     }
+
+    /* Scrollable Chart Containers */
+    .chart-outer-h {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-radius: var(--border-radius-sm);
+      background: var(--color-background-primary);
+    }
+    .chart-outer-v {
+      width: 100%;
+      height: 320px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      border-radius: var(--border-radius-sm);
+      background: var(--color-background-primary);
+    }
+    .chart-inner-h {
+      position: relative;
+      height: 320px;
+      min-width: 100%;
+    }
+    .chart-inner-v {
+      position: relative;
+      width: 100%;
+      min-height: 320px;
+    }
+
 
     :root {
       --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

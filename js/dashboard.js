@@ -6,6 +6,8 @@
     let sortAsc = false;
     let gradeFilter = 'all';
     let selectedMapBlock = "";
+    let lastBlockFilter = "";
+    let currentReportDate = "April 2026";
 
     // Active & Inactive computed sets
     let currentDataset = [];
@@ -17,6 +19,153 @@
     let chartBcg = null;
     let chartDropout = null;
     let chartLoad = null;
+
+    // Helper to extract report period/month from filename or raw rows
+    function extractReportDate(rows, fileName) {
+      const monthRegex = /(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[\s_-]*(\d{4})/i;
+      const fileMatch = fileName.match(monthRegex);
+      if (fileMatch) {
+        let month = fileMatch[1];
+        let year = fileMatch[2];
+        month = month.charAt(0).toUpperCase() + month.slice(1).toLowerCase();
+        const monthMap = {
+          'Jan': 'January', 'Feb': 'February', 'Mar': 'March', 'Apr': 'April',
+          'Jun': 'June', 'Jul': 'July', 'Aug': 'August', 'Sep': 'September',
+          'Oct': 'October', 'Nov': 'November', 'Dec': 'December'
+        };
+        if (monthMap[month]) month = monthMap[month];
+        return `${month} ${year}`;
+      }
+
+      // Try searching first few rows for keywords
+      for (let i = 0; i < Math.min(rows.length, 25); i++) {
+        const row = rows[i];
+        for (let key in row) {
+          const val = String(row[key]);
+          if (/report\s*period/i.test(key) || /report\s*period/i.test(val)) {
+            const dateMatch = val.match(/(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[\s_-]*(\d{4})/i);
+            if (dateMatch) {
+              let month = dateMatch[1];
+              let year = dateMatch[2];
+              month = month.charAt(0).toUpperCase() + month.slice(1).toLowerCase();
+              const monthMap = {
+                'Jan': 'January', 'Feb': 'February', 'Mar': 'March', 'Apr': 'April',
+                'Jun': 'June', 'Jul': 'July', 'Aug': 'August', 'Sep': 'September',
+                'Oct': 'October', 'Nov': 'November', 'Dec': 'December'
+              };
+              if (monthMap[month]) month = monthMap[month];
+              return `${month} ${year}`;
+            }
+          }
+          const dateRangeMatch = val.match(/\d{2}-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{4}\s*To\s*\d{2}-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{4}/i);
+          if (dateRangeMatch) {
+            let month = dateRangeMatch[2];
+            let year = val.match(/To\s*\d{2}-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{4})/i)?.[2];
+            if (month && year) {
+              month = month.charAt(0).toUpperCase() + month.slice(1).toLowerCase();
+              const monthMap = {
+                'Jan': 'January', 'Feb': 'February', 'Mar': 'March', 'Apr': 'April',
+                'Jun': 'June', 'Jul': 'July', 'Aug': 'August', 'Sep': 'September',
+                'Oct': 'October', 'Nov': 'November', 'Dec': 'December'
+              };
+              if (monthMap[month]) month = monthMap[month];
+              return `${month} ${year}`;
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    // Helper to download a specific Chart.js canvas as an image with solid white background
+    function downloadChart(canvasId, defaultFilename) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const ctx = tempCanvas.getContext('2d');
+
+      // Fill canvas background with white
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+      // Draw original canvas over the white background
+      ctx.drawImage(canvas, 0, 0);
+
+      // Retrieve image data and trigger download
+      const imageURI = tempCanvas.toDataURL("image/png");
+      const link = document.createElement('a');
+      const blockFilterVal = document.getElementById('block-filter').value;
+      const suffix = (blockFilterVal ? `_${blockFilterVal.replace(/\s+/g, '_')}` : '') + `_${curLevel}_${currentReportDate.replace(/\s+/g, '_')}`;
+
+      link.download = `${defaultFilename}_${suffix}.png`;
+      link.href = imageURI;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Update webpage titles and printed header names dynamically
+    function updateDynamicTitles() {
+      const blk = document.getElementById('block-filter').value;
+      const q = document.getElementById('search').value.trim();
+
+      let locationStr = "Bhagalpur District";
+      let titleStr = "Bhagalpur — Immunization Dashboard";
+
+      if (q) {
+        const matchedItems = currentDataset.filter(f => {
+          const name = curLevel === 'facility' ? f.facility : f.hsc;
+          return name.toLowerCase().includes(q.toLowerCase());
+        });
+
+        if (matchedItems.length === 1) {
+          const name = curLevel === 'facility' ? matchedItems[0].facility : matchedItems[0].hsc;
+          locationStr = `${name} (${matchedItems[0].sub_district} Block)`;
+        } else {
+          locationStr = `Search: "${q}" in Bhagalpur`;
+        }
+      } else if (blk) {
+        locationStr = `${blk} Block, Bhagalpur`;
+      }
+
+      // Update browser tab/window and PDF header
+      document.title = `${locationStr} — Immunization Report (${currentReportDate})`;
+
+      // Update header elements in DOM
+      const locEl = document.getElementById('location-text');
+      if (locEl) locEl.textContent = locationStr;
+
+      const mainTitleEl = document.getElementById('main-title');
+      if (mainTitleEl) {
+        if (q && currentDataset.filter(f => (curLevel === 'facility' ? f.facility : f.hsc).toLowerCase().includes(q.toLowerCase())).length === 1) {
+          mainTitleEl.textContent = curLevel === 'facility' ? "Facility Immunization Report" : "HSC Immunization Report";
+        } else if (blk) {
+          mainTitleEl.textContent = "Block Immunization Report";
+        } else {
+          mainTitleEl.textContent = "Bhagalpur — Immunization Dashboard";
+        }
+      }
+    }
+
+    // Update UI elements for report date
+    function updateReportDateUI(dateStr) {
+      currentReportDate = dateStr;
+      
+      const calEl = document.getElementById('calendar-text');
+      if (calEl) calEl.textContent = dateStr;
+      
+      const srTitleEl = document.getElementById('sr-header-title');
+      if (srTitleEl) srTitleEl.textContent = `Bhagalpur Health Facility & HSC Immunization Dashboard — ${dateStr}`;
+      
+      const distTitleEl = document.getElementById('district-summary-title');
+      if (distTitleEl) distTitleEl.textContent = `District summary — ${dateStr}`;
+      
+      updateDynamicTitles();
+    }
+
 
     function grade(f) {
       if (!f.sessions_held) return null;
@@ -490,6 +639,14 @@
           return h;
         });
 
+        // Extract month/year from upload
+        const detectedDate = extractReportDate(rows, fileName);
+        if (detectedDate) {
+          updateReportDateUI(detectedDate);
+        } else {
+          updateReportDateUI("Uploaded Report");
+        }
+
         // Reinitialize
         populateBlockFilter();
         changeViewLevel(curLevel);
@@ -510,6 +667,8 @@
       const defaultDataObj = JSON.parse(DEFAULT_DATA);
       DATA.facilities = defaultDataObj.facilities;
       DATA.hscs = defaultDataObj.hscs;
+
+      updateReportDateUI("April 2026");
 
       populateBlockFilter();
       changeViewLevel(curLevel);
@@ -562,7 +721,7 @@
       document.getElementById('district-avg-label').textContent = `District avg: ${distAvg}`;
 
       renderTable();
-      renderCharts(distAvg);
+      renderCharts();
       renderScorecards();
       updateMapColors();
       updateRiskAnalysis();
@@ -586,6 +745,15 @@
       const blk = document.getElementById('block-filter').value;
       const sc = document.getElementById('sort-col').value;
       
+      // Trigger chart re-rendering if block filter has changed
+      if (lastBlockFilter !== blk) {
+        lastBlockFilter = blk;
+        renderCharts();
+      }
+
+      // Update webpage title and printed header
+      updateDynamicTitles();
+
       let sortingCol = sortField;
       if (sortingCol === 'facility' && curLevel === 'hsc') sortingCol = 'hsc';
       if (sc !== sortField) { sortField = sc; sortAsc = false; sortingCol = sc; }
@@ -634,7 +802,7 @@
           <td>${f.avg_per_session.toFixed(1)}</td>
           <td><strong>${f.penta1.toLocaleString()}</strong></td>
           <td>${f.penta3.toLocaleString()}</td>
-          <td><div class="bar-w"><span style="min-width:35px">${f.bcg}</span><div class="bar-t"><div class="bar-f" style="width:${Math.min(f.bcg / maxBCGVal, 100)}%;background:${f.bcg < (maxBCGVal*10)?'var(--color-danger)':f.bcg < (maxBCGVal*30)?'var(--color-warning)':'var(--color-success)'}"></div></div></div></td>
+          <td><strong>${f.bcg.toLocaleString()}</strong></td>
           <td>${f.mr1}</td>
           <td>${f.mr2}</td>
           <td>${f.dropout_penta !== null ? `<span class="pill ${doColor(f.dropout_penta)}">${doText(f.dropout_penta)}</span>` : '—'}</td>
@@ -679,14 +847,75 @@
     Chart.defaults.font.weight = 500;
     Chart.defaults.color = '#64748b';
 
-    function renderCharts(distAvg) {
+    function renderCharts() {
       if (chartPenta) chartPenta.destroy();
       if (chartBcg) chartBcg.destroy();
       if (chartDropout) chartDropout.destroy();
       if (chartLoad) chartLoad.destroy();
 
-      const top16 = active.slice(0, 16);
-      const displayNameOf = f => curLevel === 'facility' ? f.facility : f.hsc;
+      // Filter chart data by block if one is selected
+      const blk = document.getElementById('block-filter').value;
+      let chartActive;
+      let isHscDataForCharts = false;
+
+      if (blk) {
+        // Show HSC-wise data of that specific block
+        chartActive = DATA.hscs.filter(h => h.sub_district === blk && h.sessions_held > 0);
+        isHscDataForCharts = true;
+      } else {
+        chartActive = active;
+        isHscDataForCharts = (curLevel === 'hsc');
+      }
+
+      // Update titles dynamically based on whether charts display HSC or facility level data
+      const chartLevelText = isHscDataForCharts ? 'HSC' : 'facility';
+      const chartActiveText = isHscDataForCharts ? 'active HSCs' : 'active facilities';
+      document.getElementById('chart-penta-title').innerHTML = `<i class="ti ti-chart-bar" style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Penta-1 coverage by ${chartLevelText} (top 16 active)`;
+      document.getElementById('chart-bcg-title').innerHTML = `<i class="ti ti-chart-arrows" style="margin-right:6px; vertical-align:middle; color:var(--color-warning)"></i>BCG vs Penta-1 — ${chartLevelText} gap analysis`;
+      document.getElementById('chart-dropout-title').innerHTML = `<i class="ti ti-chart-area" style="margin-right:6px; vertical-align:middle; color:var(--color-danger)"></i>Dropout — Penta-1 → Penta-3 (${chartActiveText})`;
+      document.getElementById('chart-load-title').innerHTML = `<i class="ti ti-chart-line" style="margin-right:6px; vertical-align:middle; color:#6366f1"></i>Session load — avg beneficiaries per session by ${chartLevelText}`;
+
+      // Compute average dynamically based on whether we are showing HSC or facility level
+      const avgDataset = isHscDataForCharts ? DATA.hscs.filter(h => h.sessions_held > 0) : DATA.facilities.filter(f => f.sessions_held > 0);
+      const tot_bene = avgDataset.reduce((s, f) => s + f.total_beneficiaries, 0);
+      const tot_sess = avgDataset.reduce((s, f) => s + f.sessions_held, 0);
+      const computedDistAvg = tot_sess > 0 ? (tot_bene / tot_sess).toFixed(1) : "0.0";
+      document.getElementById('district-avg-label').textContent = `District avg: ${computedDistAvg}`;
+      const parsedDistAvg = parseFloat(computedDistAvg);
+
+      const numItems = chartActive.length;
+
+      // Sizing horizontal scroll chart wrappers
+      const pentaWrapper = document.getElementById('c-penta-wrapper');
+      if (pentaWrapper) {
+        const parentWidth = pentaWrapper.parentElement.clientWidth || 600;
+        const dynamicWidth = Math.max(parentWidth, numItems * 35);
+        pentaWrapper.style.width = `${dynamicWidth}px`;
+      }
+
+      const bcgWrapper = document.getElementById('c-bcg-wrapper');
+      if (bcgWrapper) {
+        const parentWidth = bcgWrapper.parentElement.clientWidth || 600;
+        const dynamicWidth = Math.max(parentWidth, numItems * 35);
+        bcgWrapper.style.width = `${dynamicWidth}px`;
+      }
+
+      // Sizing vertical scroll wrapper (Dropout is a horizontal bar chart)
+      const act_do = chartActive.filter(f => f.dropout_penta !== null);
+      const dropoutWrapper = document.getElementById('c-dropout-wrapper');
+      if (dropoutWrapper) {
+        const dynamicHeight = Math.max(320, act_do.length * 25);
+        dropoutWrapper.style.height = `${dynamicHeight}px`;
+      }
+
+      const loadWrapper = document.getElementById('c-load-wrapper');
+      if (loadWrapper) {
+        const parentWidth = loadWrapper.parentElement.clientWidth || 600;
+        const dynamicWidth = Math.max(parentWidth, numItems * 35);
+        loadWrapper.style.width = `${dynamicWidth}px`;
+      }
+
+      const displayNameOf = f => isHscDataForCharts ? f.hsc : f.facility;
       
       const shortName = n => {
         let name = displayNameOf(n);
@@ -700,10 +929,10 @@
       chartPenta = new Chart(document.getElementById('c-penta'), {
         type: 'bar',
         data: {
-          labels: top16.map(f => shortName(f)),
+          labels: chartActive.map(f => shortName(f)),
           datasets: [
-            { label: 'Penta-1', data: top16.map(f => f.penta1), backgroundColor: '#2563eb', borderRadius: 4, stack: 's' },
-            { label: 'Penta-3', data: top16.map(f => f.penta3), backgroundColor: '#10b981', borderRadius: 4, stack: 's2' }
+            { label: 'Penta-1', data: chartActive.map(f => f.penta1), backgroundColor: '#2563eb', borderRadius: 4, stack: 's' },
+            { label: 'Penta-3', data: chartActive.map(f => f.penta3), backgroundColor: '#10b981', borderRadius: 4, stack: 's2' }
           ]
         },
         options: {
@@ -727,7 +956,7 @@
       });
 
       // 2. BCG vs Penta Chart
-      const sorted_bcg = [...active].sort((a, b) => b.penta1 - a.penta1).slice(0, 14);
+      const sorted_bcg = [...chartActive].sort((a, b) => b.penta1 - a.penta1);
       chartBcg = new Chart(document.getElementById('c-bcg'), {
         type: 'bar',
         data: {
@@ -766,14 +995,13 @@
       });
 
       // 3. Dropout Chart
-      const act_do = active.filter(f => f.dropout_penta !== null);
       const doColors = act_do.map(f => f.dropout_penta > 10 ? '#ef4444' : f.dropout_penta >= 0 ? '#f59e0b' : '#10b981');
       
       chartDropout = new Chart(document.getElementById('c-dropout'), {
         type: 'bar',
         data: {
-          labels: act_do.slice(0, 16).map(f => shortName(f)),
-          datasets: [{ label: 'Dropout %', data: act_do.slice(0, 16).map(f => f.dropout_penta), backgroundColor: doColors.slice(0, 16), borderRadius: 4, borderSkipped: false }]
+          labels: act_do.map(f => shortName(f)),
+          datasets: [{ label: 'Dropout %', data: act_do.map(f => f.dropout_penta), backgroundColor: doColors, borderRadius: 4, borderSkipped: false }]
         },
         options: {
           responsive: true,
@@ -797,9 +1025,8 @@
       });
 
       // 4. Session Load Chart
-      const sortedLoad = [...active].sort((a, b) => b.avg_per_session - a.avg_per_session).slice(0, 16);
-      const parsedDistAvg = parseFloat(distAvg);
-
+      const sortedLoad = [...chartActive].sort((a, b) => b.avg_per_session - a.avg_per_session);
+      
       chartLoad = new Chart(document.getElementById('c-load'), {
         type: 'bar',
         data: {

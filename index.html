@@ -24,14 +24,14 @@
 <body>
 
   <div class="d">
-    <h2 class="sr-only">Bhagalpur Health Facility & HSC Immunization Dashboard — April 2026</h2>
+    <h2 class="sr-only" id="sr-header-title">Bhagalpur Health Facility & HSC Immunization Dashboard — April 2026</h2>
 
     <!-- Premium Header -->
     <div class="hdr">
       <div>
-        <h1>Bhagalpur — Immunization Dashboard</h1>
-        <p><i class="ti ti-map-pin" style="margin-right: 4px; vertical-align: middle;"></i>Bhagalpur District &nbsp;·&nbsp;
-          <i class="ti ti-calendar" style="margin-right: 4px; margin-left: 8px; vertical-align: middle;"></i>April 2026
+        <h1 id="main-title">Bhagalpur — Immunization Dashboard</h1>
+        <p><i class="ti ti-map-pin" style="margin-right: 4px; vertical-align: middle;"></i><span id="location-text">Bhagalpur District</span> &nbsp;·&nbsp;
+          <i class="ti ti-calendar" style="margin-right: 4px; margin-left: 8px; vertical-align: middle;"></i><span id="calendar-text">April 2026</span>
           &nbsp;·&nbsp; <i class="ti ti-chart-bar"
             style="margin-right: 4px; margin-left: 8px; vertical-align: middle;"></i>Session site coverage data</p>
       </div>
@@ -59,7 +59,7 @@
 
 
 
-    <div class="sec-lbl">District summary — April 2026</div>
+    <div class="sec-lbl" id="district-summary-title">District summary — April 2026</div>
     <div class="kpis" id="kpi-row"></div>
 
     <!-- Alert Banner -->
@@ -132,53 +132,74 @@
     <!-- Performance Charts Group 1 -->
     <div class="charts2">
       <div class="card" style="margin:0">
-        <div class="card-ttl" id="chart-penta-title"><i class="ti ti-chart-bar"
-            style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Penta-1 coverage (top 16 active)</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <div class="card-ttl" id="chart-penta-title" style="margin:0"><i class="ti ti-chart-bar"
+              style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Penta-1 coverage (top 16 active)</div>
+          <button class="tb chart-dl-btn" onclick="downloadChart('c-penta', 'Penta-1_coverage')" style="padding:4px 8px; font-size:11px; margin:0;"><i class="ti ti-download"></i> Download</button>
+        </div>
         <div class="lgd">
           <span><span class="ld" style="background:#2563eb"></span>Penta-1</span>
           <span><span class="ld" style="background:#10b981"></span>Penta-3</span>
         </div>
-        <div style="position:relative; height:320px"><canvas id="c-penta" role="img"
-            aria-label="Penta chart">Penta chart</canvas></div>
+        <div class="chart-outer-h">
+          <div id="c-penta-wrapper" class="chart-inner-h">
+            <canvas id="c-penta" role="img" aria-label="Penta chart">Penta chart</canvas>
+          </div>
+        </div>
       </div>
       <div class="card" style="margin:0">
-        <div class="card-ttl" id="chart-bcg-title"><i class="ti ti-chart-arrows"
-            style="margin-right:6px; vertical-align:middle; color:var(--color-warning)"></i>BCG vs Penta-1 — coverage
-          gap analysis</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <div class="card-ttl" id="chart-bcg-title" style="margin:0"><i class="ti ti-chart-arrows"
+              style="margin-right:6px; vertical-align:middle; color:var(--color-warning)"></i>BCG vs Penta-1 — coverage gap analysis</div>
+          <button class="tb chart-dl-btn" onclick="downloadChart('c-bcg', 'BCG_vs_Penta-1')" style="padding:4px 8px; font-size:11px; margin:0;"><i class="ti ti-download"></i> Download</button>
+        </div>
         <div class="lgd">
           <span><span class="ld" style="background:#f59e0b"></span>BCG</span>
           <span><span class="ld" style="background:#2563eb"></span>Penta-1</span>
-          <span style="color:var(--color-text-tertiary); font-size:11px; margin-left:auto;">BCG–Penta gap flags
-            zero-dose risk</span>
+          <span style="color:var(--color-text-tertiary); font-size:11px; margin-left:auto;">BCG–Penta gap flags zero-dose risk</span>
         </div>
-        <div style="position:relative; height:320px"><canvas id="c-bcg" role="img"
-            aria-label="BCG chart">BCG chart</canvas></div>
+        <div class="chart-outer-h">
+          <div id="c-bcg-wrapper" class="chart-inner-h">
+            <canvas id="c-bcg" role="img" aria-label="BCG chart">BCG chart</canvas>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Performance Charts Group 2 -->
     <div class="charts2">
       <div class="card" style="margin:0">
-        <div class="card-ttl" id="chart-dropout-title"><i class="ti ti-chart-area"
-            style="margin-right:6px; vertical-align:middle; color:var(--color-danger)"></i>Dropout — Penta-1 → Penta-3 (active)</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <div class="card-ttl" id="chart-dropout-title" style="margin:0"><i class="ti ti-chart-area"
+              style="margin-right:6px; vertical-align:middle; color:var(--color-danger)"></i>Dropout — Penta-1 → Penta-3 (active)</div>
+          <button class="tb chart-dl-btn" onclick="downloadChart('c-dropout', 'Penta_dropout_rate')" style="padding:4px 8px; font-size:11px; margin:0;"><i class="ti ti-download"></i> Download</button>
+        </div>
         <div class="lgd">
           <span><span class="ld" style="background:#ef4444"></span>&gt;10% loss</span>
           <span><span class="ld" style="background:#f59e0b"></span>0–10%</span>
           <span><span class="ld" style="background:#10b981"></span>Inflow (&lt;0)</span>
         </div>
-        <div style="position:relative; height:320px"><canvas id="c-dropout" role="img"
-            aria-label="Dropout chart">Dropout chart</canvas></div>
+        <div class="chart-outer-v">
+          <div id="c-dropout-wrapper" class="chart-inner-v">
+            <canvas id="c-dropout" role="img" aria-label="Dropout chart">Dropout chart</canvas>
+          </div>
+        </div>
       </div>
       <div class="card" style="margin:0">
-        <div class="card-ttl" id="chart-load-title"><i class="ti ti-chart-line"
-            style="margin-right:6px; vertical-align:middle; color:#6366f1"></i>Session load — avg beneficiaries per
-          session</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <div class="card-ttl" id="chart-load-title" style="margin:0"><i class="ti ti-chart-line"
+              style="margin-right:6px; vertical-align:middle; color:#6366f1"></i>Session load — avg beneficiaries per session</div>
+          <button class="tb chart-dl-btn" onclick="downloadChart('c-load', 'Session_load_avg')" style="padding:4px 8px; font-size:11px; margin:0;"><i class="ti ti-download"></i> Download</button>
+        </div>
         <div class="lgd">
           <span><span class="ld" style="background:#6366f1"></span>Avg/session</span>
           <span style="color:var(--color-text-tertiary); font-size:11px; margin-left:auto;" id="district-avg-label">District avg: 13.9</span>
         </div>
-        <div style="position:relative; height:320px"><canvas id="c-load" role="img"
-            aria-label="Load chart">Load chart</canvas></div>
+        <div class="chart-outer-h">
+          <div id="c-load-wrapper" class="chart-inner-h">
+            <canvas id="c-load" role="img" aria-label="Load chart">Load chart</canvas>
+          </div>
+        </div>
       </div>
     </div>
 
