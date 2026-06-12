@@ -1,4 +1,4 @@
-    Chart.register(ChartDataLabels);
+Chart.register(ChartDataLabels);
 
     let curLevel = 'facility'; // 'facility' or 'hsc'
     let curView = 'active'; // 'active', 'all', 'inactive'
@@ -19,6 +19,15 @@
     let chartDropout = null;
     let chartLoad = null;
     let curDropoutMetric = 'penta';
+
+    // Target analysis state variables
+    let targetSource = 'fixed'; // 'fixed' or 'custom'
+    let targetPeriod = 'monthly'; // 'yearly' or 'monthly'
+    let targetMetric = 'penta1'; // 'penta1', 'bcg', 'mr1', 'infants', 'total_beneficiaries'
+    let targetSortMode = 'rate_desc'; // 'rate_desc', 'rate_asc', 'name_asc', 'target_desc'
+    let customTargets = {};
+    let chartTargetAchievement = null;
+    let customTargetsLocked = true;
 
     // Antigen comparison configuration
     const ANTIGENS = {
@@ -782,6 +791,23 @@
         facHeader.setAttribute('onclick', "sortBy('hsc')");
       }
 
+      // Toggle target columns visibility in the table headers and cells
+      const targetCols = document.querySelectorAll('.target-column');
+      targetCols.forEach(col => {
+        col.style.display = (lvl === 'facility' ? '' : 'none');
+      });
+
+      // Toggle target achievement UI controls and alerts
+      const targetControls = document.getElementById('target-controls-container');
+      const targetHscAlert = document.getElementById('target-hsc-alert');
+      if (lvl === 'facility') {
+        if (targetControls) targetControls.style.display = 'block';
+        if (targetHscAlert) targetHscAlert.style.display = 'none';
+      } else {
+        if (targetControls) targetControls.style.display = 'none';
+        if (targetHscAlert) targetHscAlert.style.display = 'flex';
+      }
+
       // Update titles
       document.getElementById('chart-penta-title').innerHTML = `<i class="ti ti-chart-bar" style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Antigen coverage by ${lvl === 'facility' ? 'facility' : 'HSC'}`;
       const suffixEl = document.getElementById('chart-dropout-suffix');
@@ -813,6 +839,7 @@
       renderScorecards();
       updateMapColors();
       updateRiskAnalysis();
+      renderTargetAchievement();
     }
 
     function setView(v) {
@@ -857,7 +884,25 @@
       if (blk) data = data.filter(f => f.sub_district === blk);
 
       data = [...data].sort((a, b) => {
-        const av = a[sortingCol] ?? -9999, bv = b[sortingCol] ?? -9999;
+        let av, bv;
+        if (sortingCol === 'target_fixed') {
+          av = getFixedTarget(a.facility);
+          bv = getFixedTarget(b.facility);
+        } else if (sortingCol === 'target_achievement') {
+          const aFixed = getFixedTarget(a.facility);
+          const aCustom = customTargets[a.facility] !== undefined ? customTargets[a.facility] : aFixed;
+          const aTarget = targetSource === 'fixed' ? aFixed : aCustom;
+          av = aTarget > 0 ? ((a[targetMetric] || 0) / aTarget) : 0;
+
+          const bFixed = getFixedTarget(b.facility);
+          const bCustom = customTargets[b.facility] !== undefined ? customTargets[b.facility] : bFixed;
+          const bTarget = targetSource === 'fixed' ? bFixed : bCustom;
+          bv = bTarget > 0 ? ((b[targetMetric] || 0) / bTarget) : 0;
+        } else {
+          av = a[sortingCol] ?? -9999;
+          bv = b[sortingCol] ?? -9999;
+        }
+
         if (typeof av === 'string' && typeof bv === 'string') {
           return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
         }
@@ -866,7 +911,7 @@
 
       const tbody = document.getElementById('fac-body');
       if (!data.length) { 
-        tbody.innerHTML = `<tr><td colspan="14" class="no-data"><i class="ti ti-ban" style="font-size:24px; display:block; margin-bottom:8px; color:var(--color-text-tertiary)"></i>No items match the search criteria</td></tr>`; 
+        tbody.innerHTML = `<tr><td colspan="${curLevel === 'facility' ? 17 : 14}" class="no-data"><i class="ti ti-ban" style="font-size:24px; display:block; margin-bottom:8px; color:var(--color-text-tertiary)"></i>No items match the search criteria</td></tr>`; 
         document.getElementById('tbl-count').textContent = `Showing 0 items`;
         return; 
       }
@@ -878,8 +923,37 @@
         const displayName = curLevel === 'facility' ? f.facility : f.hsc;
         const blockName = f.sub_district;
         
-        // Progress bar scaling
-        const maxBCGVal = curLevel === 'facility' ? 8 : 1.2;
+        let targetCells = '';
+        if (curLevel === 'facility') {
+          const fixedTarget = getFixedTarget(f.facility);
+          const customTarget = customTargets[f.facility] !== undefined ? customTargets[f.facility] : fixedTarget;
+          
+          const baseTarget = targetSource === 'fixed' ? fixedTarget : customTarget;
+          const targetVal = targetPeriod === 'yearly' ? baseTarget : parseFloat((baseTarget / 12).toFixed(1));
+          
+          const achievedVal = f[targetMetric] || 0;
+          const achPct = targetVal > 0 ? (achievedVal / targetVal * 100) : 0;
+          
+          let achCls = 'pr';
+          if (achPct >= 100) achCls = 'pg';
+          else if (achPct >= 80) achCls = 'pa';
+          
+          const achText = targetVal > 0 ? `${achPct.toFixed(0)}%` : '—';
+          
+          // Use a clean and responsive progress layout
+          targetCells = `
+            <td class="target-column" style="font-weight:600;">${fixedTarget}</td>
+            <td class="target-column">
+              <input type="number" class="target-input" value="${customTarget}" onchange="updateCustomTarget('${f.facility.replace(/'/g, "\\'")}', this.value)" ${customTargetsLocked ? 'disabled' : ''}>
+            </td>
+            <td class="target-column">
+              <div class="bar-w">
+                <span class="pill ${achCls}">${achText}</span>
+                <div class="bar-t" style="height:5px;"><div class="bar-f" style="width:${Math.min(achPct, 100)}%; background:${achPct >= 100 ? '#10b981' : achPct >= 80 ? '#f59e0b' : '#ef4444'};"></div></div>
+              </div>
+            </td>
+          `;
+        }
 
         return `<tr>
           <td style="font-weight:700;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${displayName}">${displayName}</td>
@@ -895,9 +969,11 @@
           <td>${f.mr2}</td>
           <td>${f.dropout_penta !== null ? `<span class="pill ${doColor(f.dropout_penta)}">${doText(f.dropout_penta)}</span>` : '—'}</td>
           <td>${f.dropout_mr !== null ? `<span class="pill ${doColor(f.dropout_mr)}">${doText(f.dropout_mr)}</span>` : '—'}</td>
+          ${targetCells}
           <td>${gpill}</td>
         </tr>`;
       }).join('');
+
       document.getElementById('tbl-count').textContent = `Showing ${data.length} item${data.length !== 1 ? 's' : ''}`;
     }
 
@@ -1198,10 +1274,732 @@
       el.innerHTML = htmlContent;
     }
 
-    // Initialize Dashboard Level
+    // Target analysis functions and state management
+    function initializeCustomTargets() {
+      const saved = localStorage.getItem('bhagalpur_custom_targets');
+      if (saved) {
+        try {
+          customTargets = JSON.parse(saved);
+        } catch (e) {
+          console.error("Error parsing custom targets from localStorage", e);
+          customTargets = {};
+        }
+      }
+      
+      if (typeof DATA !== 'undefined' && DATA.facilities) {
+        DATA.facilities.forEach(f => {
+          const fixedVal = getFixedTarget(f.facility);
+          if (customTargets[f.facility] === undefined) {
+            customTargets[f.facility] = fixedVal;
+          }
+        });
+      }
+      saveCustomTargets();
+    }
+    window.initializeCustomTargets = initializeCustomTargets;
+
+    function saveCustomTargets() {
+      localStorage.setItem('bhagalpur_custom_targets', JSON.stringify(customTargets));
+    }
+    window.saveCustomTargets = saveCustomTargets;
+
+    function changeTargetSource(src) {
+      targetSource = src;
+      document.getElementById('btn-target-source-fixed').classList.toggle('on', src === 'fixed');
+      document.getElementById('btn-target-source-custom').classList.toggle('on', src === 'custom');
+      
+      const bulkEditor = document.getElementById('custom-target-bulk-editor');
+      if (bulkEditor) {
+        bulkEditor.style.display = (src === 'custom' ? 'flex' : 'none');
+      }
+
+      renderTable();
+      renderTargetAchievement();
+    }
+    window.changeTargetSource = changeTargetSource;
+
+    function changeTargetPeriod(period) {
+      targetPeriod = period;
+      document.getElementById('btn-target-period-yearly').classList.toggle('on', period === 'yearly');
+      document.getElementById('btn-target-period-monthly').classList.toggle('on', period === 'monthly');
+
+      renderTable();
+      renderTargetAchievement();
+    }
+    window.changeTargetPeriod = changeTargetPeriod;
+
+    function onTargetMetricChange() {
+      const select = document.getElementById('target-metric-select');
+      if (select) {
+        targetMetric = select.value;
+      }
+      renderTable();
+      renderTargetAchievement();
+    }
+    window.onTargetMetricChange = onTargetMetricChange;
+
+    function onTargetSortChange() {
+      const select = document.getElementById('target-sort-select');
+      if (select) {
+        targetSortMode = select.value;
+      }
+      renderTargetAchievement();
+    }
+    window.onTargetSortChange = onTargetSortChange;
+
+    function updateCustomTarget(facilityName, value) {
+      if (customTargetsLocked) {
+        alert("Editing is locked. Please unlock first using your passcode.");
+        renderTable();
+        return;
+      }
+      let numVal = parseFloat(value);
+      if (isNaN(numVal) || numVal < 0) numVal = 0;
+      customTargets[facilityName] = Math.round(numVal);
+      saveCustomTargets();
+      
+      renderTable();
+      renderTargetAchievement();
+    }
+    window.updateCustomTarget = updateCustomTarget;
+
+    function adjustCustomTargetsBulk(factor) {
+      if (customTargetsLocked) {
+        alert("Editing is locked. Please unlock first using your passcode.");
+        return;
+      }
+      for (let key in customTargets) {
+        let currentTarget = customTargets[key];
+        customTargets[key] = Math.round(currentTarget * factor);
+      }
+      saveCustomTargets();
+      renderTable();
+      renderTargetAchievement();
+    }
+    window.adjustCustomTargetsBulk = adjustCustomTargetsBulk;
+
+    function resetCustomTargetsBulk() {
+      if (customTargetsLocked) {
+        alert("Editing is locked. Please unlock first using your passcode.");
+        return;
+      }
+      if (typeof DATA !== 'undefined' && DATA.facilities) {
+        DATA.facilities.forEach(f => {
+          customTargets[f.facility] = getFixedTarget(f.facility);
+        });
+      }
+      saveCustomTargets();
+      renderTable();
+      renderTargetAchievement();
+    }
+    window.resetCustomTargetsBulk = resetCustomTargetsBulk;
+
+    function setBulkCustomTargetsValue() {
+      if (customTargetsLocked) {
+        alert("Editing is locked. Please unlock first using your passcode.");
+        return;
+      }
+      const valInput = document.getElementById('bulk-multiplier-value');
+      if (!valInput) return;
+      let val = parseFloat(valInput.value);
+      if (isNaN(val) || val < 0) return;
+      
+      for (let key in customTargets) {
+        customTargets[key] = Math.round(val);
+      }
+      saveCustomTargets();
+      valInput.value = ''; 
+      renderTable();
+      renderTargetAchievement();
+    }
+    window.setBulkCustomTargetsValue = setBulkCustomTargetsValue;
+
+    // PIN lock / unlock state management functions
+    const DEFAULT_PIN = "2026"; // Default passcode matching yearly ELA targets year
+
+    function getTargetPIN() {
+      return localStorage.getItem('bhagalpur_targets_lock_pwd') || DEFAULT_PIN;
+    }
+
+    function startUnlock() {
+      document.getElementById('btn-target-lock').style.display = 'none';
+      document.getElementById('target-unlock-box').style.display = 'inline-flex';
+      
+      const pinInput = document.getElementById('target-passcode-input');
+      if (pinInput) {
+        pinInput.value = '';
+        pinInput.focus();
+      }
+    }
+    window.startUnlock = startUnlock;
+
+    function cancelTargetUnlock() {
+      document.getElementById('target-unlock-box').style.display = 'none';
+      document.getElementById('btn-target-lock').style.display = 'inline-flex';
+    }
+    window.cancelTargetUnlock = cancelTargetUnlock;
+
+    function verifyTargetPasscode() {
+      const pinInput = document.getElementById('target-passcode-input');
+      if (!pinInput) return;
+      
+      const enteredPIN = pinInput.value.trim();
+      const currentPIN = getTargetPIN();
+      
+      if (enteredPIN === currentPIN) {
+        customTargetsLocked = false;
+        
+        // Update UI buttons
+        document.getElementById('target-unlock-box').style.display = 'none';
+        document.getElementById('btn-target-lock').style.display = 'none';
+        document.getElementById('btn-target-unlock').style.display = 'inline-flex';
+        
+        // Show change PIN settings button
+        const changePinBtn = document.getElementById('btn-change-pin');
+        if (changePinBtn) changePinBtn.style.display = 'inline-flex';
+        
+        // Refresh table to enable inputs
+        renderTable();
+      } else {
+        alert("Incorrect PIN passcode. Access denied.");
+        pinInput.value = '';
+        pinInput.focus();
+      }
+    }
+    window.verifyTargetPasscode = verifyTargetPasscode;
+
+    function lockTargets() {
+      customTargetsLocked = true;
+      
+      // Update UI buttons
+      document.getElementById('btn-target-unlock').style.display = 'none';
+      document.getElementById('btn-change-pin').style.display = 'none';
+      document.getElementById('btn-target-lock').style.display = 'inline-flex';
+      
+      // Refresh table to disable inputs
+      renderTable();
+    }
+    window.lockTargets = lockTargets;
+
+    function changeTargetPIN() {
+      if (customTargetsLocked) return;
+      
+      const currentPIN = getTargetPIN();
+      const oldPIN = prompt("To change your PIN, first enter your current PIN:");
+      if (oldPIN === null) return; // cancelled
+      
+      if (oldPIN !== currentPIN) {
+        alert("Incorrect current PIN.");
+        return;
+      }
+      
+      const newPIN1 = prompt("Enter new PIN:");
+      if (!newPIN1) {
+        alert("PIN cannot be empty.");
+        return;
+      }
+      
+      const newPIN2 = prompt("Confirm new PIN:");
+      if (newPIN1 !== newPIN2) {
+        alert("New PINs do not match.");
+        return;
+      }
+      
+      localStorage.setItem('bhagalpur_targets_lock_pwd', newPIN1);
+      alert("PIN passcode changed successfully!");
+    }
+    window.changeTargetPIN = changeTargetPIN;
+
+
+    function renderTargetAchievement() {
+      if (curLevel !== 'facility') return; 
+
+      const q = document.getElementById('search').value.toLowerCase();
+      const blk = document.getElementById('block-filter').value;
+
+      // Filter facilities
+      let chartActive = DATA.facilities;
+      if (q) {
+        chartActive = chartActive.filter(f => f.facility.toLowerCase().includes(q) || f.sub_district.toLowerCase().includes(q));
+      }
+      if (blk) {
+        chartActive = chartActive.filter(f => f.sub_district === blk);
+      }
+
+      // Calculate targets and achievements for each facility
+      const processed = chartActive.map(f => {
+        const fixedTarget = getFixedTarget(f.facility);
+        const customTarget = customTargets[f.facility] !== undefined ? customTargets[f.facility] : fixedTarget;
+        const baseTarget = targetSource === 'fixed' ? fixedTarget : customTarget;
+        
+        // Scale by period
+        const targetVal = targetPeriod === 'yearly' ? baseTarget : parseFloat((baseTarget / 12).toFixed(1));
+        const actualVal = f[targetMetric] || 0;
+        const achRate = targetVal > 0 ? (actualVal / targetVal * 100) : 0;
+        
+        return {
+          facility: f.facility,
+          shortName: f.facility.replace(/ CHC| PHC| UPHC| HSC/g, '').substring(0, 12),
+          target: targetVal,
+          actual: actualVal,
+          rate: achRate
+        };
+      });
+
+      // Sort according to targetSortMode
+      if (targetSortMode === 'rate_desc') {
+        processed.sort((a, b) => b.rate - a.rate);
+      } else if (targetSortMode === 'rate_asc') {
+        processed.sort((a, b) => a.rate - b.rate);
+      } else if (targetSortMode === 'name_asc') {
+        processed.sort((a, b) => a.facility.localeCompare(b.facility));
+      } else if (targetSortMode === 'target_desc') {
+        processed.sort((a, b) => b.target - a.target);
+      }
+
+      // Update KPI counters inside target achievement card
+      const totalTarget = processed.reduce((sum, item) => sum + item.target, 0);
+      const totalActual = processed.reduce((sum, item) => sum + item.actual, 0);
+      const overallRate = totalTarget > 0 ? (totalActual / totalTarget * 100) : 0;
+      const facilitiesAchievedCount = processed.filter(item => item.rate >= 100).length;
+      
+      const metricLabels = {
+        penta1: 'Penta-1',
+        bcg: 'BCG',
+        mr1: 'MR-1',
+        infants: 'Infants',
+        total_beneficiaries: 'Beneficiaries'
+      };
+      const currentMetricLabel = metricLabels[targetMetric] || 'Actual';
+
+      const targetKpiRow = document.getElementById('target-kpi-row');
+      if (targetKpiRow) {
+        targetKpiRow.innerHTML = `
+          <div class="kpi bl">
+            <div>
+              <div class="kpi-lbl">Total Target</div>
+              <div class="kpi-val">${Math.round(totalTarget).toLocaleString()}</div>
+            </div>
+            <div class="kpi-sub">${targetPeriod === 'yearly' ? 'Yearly' : 'Monthly'} Target Total</div>
+          </div>
+          <div class="kpi gr">
+            <div>
+              <div class="kpi-lbl">Total ${currentMetricLabel} Achieved</div>
+              <div class="kpi-val">${totalActual.toLocaleString()}</div>
+            </div>
+            <div class="kpi-sub">Total actual vaccinations</div>
+          </div>
+          <div class="kpi ${overallRate >= 100 ? 'gr' : overallRate >= 80 ? 'am' : 're'}">
+            <div>
+              <div class="kpi-lbl">Overall Achievement Rate</div>
+              <div class="kpi-val">${overallRate.toFixed(1)}%</div>
+            </div>
+            <div class="kpi-sub">Based on ${targetSource === 'fixed' ? 'Fixed ELA' : 'Custom'} targets</div>
+          </div>
+          <div class="kpi bl">
+            <div>
+              <div class="kpi-lbl">Facilities Achieved Target</div>
+              <div class="kpi-val">${facilitiesAchievedCount} <span style="font-size:14px; font-weight:600; color:var(--color-text-secondary)">/ ${processed.length}</span></div>
+            </div>
+            <div class="kpi-sub">Achievement rate ≥ 100%</div>
+          </div>
+        `;
+      }
+
+      // Resize chart container
+      const targetWrapper = document.getElementById('c-target-wrapper');
+      if (targetWrapper) {
+        const parentWidth = targetWrapper.parentElement.clientWidth || 600;
+        const dynamicWidth = Math.max(parentWidth, processed.length * 60);
+        targetWrapper.style.width = `${dynamicWidth}px`;
+      }
+
+      // Draw Chart
+      if (chartTargetAchievement) chartTargetAchievement.destroy();
+
+      const ctx = document.getElementById('c-target-achievement');
+      if (!ctx) return;
+
+      const actColors = processed.map(item => {
+        if (item.rate >= 100) return '#10b981'; // green
+        if (item.rate >= 80) return '#f59e0b'; // orange
+        return '#ef4444'; // red
+      });
+
+      chartTargetAchievement = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: processed.map(item => item.shortName),
+          datasets: [
+            {
+              label: 'Target',
+              data: processed.map(item => item.target),
+              backgroundColor: '#cbd5e1',
+              borderRadius: 4,
+              categoryPercentage: 0.8,
+              barPercentage: 0.8
+            },
+            {
+              label: `${currentMetricLabel} Actual`,
+              data: processed.map(item => item.actual),
+              backgroundColor: actColors,
+              borderRadius: 4,
+              categoryPercentage: 0.8,
+              barPercentage: 0.8
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+              labels: {
+                font: { size: 11, weight: 'bold' }
+              }
+            },
+            datalabels: {
+              anchor: 'end',
+              align: 'top',
+              font: { size: 8, weight: 'bold' },
+              color: '#475569',
+              formatter: (v, context) => {
+                if (context.datasetIndex === 1) {
+                  const rate = processed[context.dataIndex].rate;
+                  return rate > 0 ? `${rate.toFixed(0)}%` : '0%';
+                }
+                return null;
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { font: { size: 9 }, color: '#64748b', maxRotation: 45, autoSkip: false },
+              grid: { display: false }
+            },
+            y: {
+              grace: '15%',
+              ticks: { font: { size: 10 }, color: '#64748b' },
+              grid: { color: '#f1f5f9' }
+            }
+          }
+        }
+      });
+    }
+    window.renderTargetAchievement = renderTargetAchievement;
+
+
+    // ── Target Editor Modal ──────────────────────────────────────────────────
+
+    // Staging object: holds edits made inside the modal before the user saves
+    let modalStagedTargets = {};
+
+    function openTargetEditor() {
+      if (customTargetsLocked) {
+        // Auto-trigger the unlock flow so the user doesn't have to find the lock button manually
+        startUnlock();
+        const lockSection = document.getElementById('btn-target-lock');
+        if (lockSection) lockSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Show a non-blocking tooltip-style hint
+        const hint = document.createElement('div');
+        hint.textContent = '🔐 Enter your PIN to edit facility targets';
+        hint.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f8fafc;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:2000;box-shadow:0 4px 16px rgba(0,0,0,0.3);animation:modalFadeIn 0.2s ease;';
+        document.body.appendChild(hint);
+        setTimeout(() => hint.remove(), 3000);
+        return;
+      }
+
+      // Deep-copy current custom targets into the staging object
+      modalStagedTargets = Object.assign({}, customTargets);
+
+      // Render the modal table
+      renderModalTable();
+      updateModalTotals();
+
+      // Clear search
+      const searchEl = document.getElementById('modal-facility-search');
+      if (searchEl) searchEl.value = '';
+
+      // Show modal
+      const modal = document.getElementById('target-editor-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+      }
+    }
+    window.openTargetEditor = openTargetEditor;
+
+    function closeTargetEditor() {
+      const modal = document.getElementById('target-editor-modal');
+      if (modal) modal.style.display = 'none';
+      document.body.style.overflow = '';
+      modalStagedTargets = {};
+    }
+    window.closeTargetEditor = closeTargetEditor;
+
+    // Close modal when clicking the dark overlay behind it
+    function onModalOverlayClick(event) {
+      if (event.target.id === 'target-editor-modal') closeTargetEditor();
+    }
+    window.onModalOverlayClick = onModalOverlayClick;
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('target-editor-modal');
+        if (modal && modal.style.display !== 'none') closeTargetEditor();
+      }
+    });
+
+    function renderModalTable(filter) {
+      const tbody = document.getElementById('modal-target-body');
+      if (!tbody) return;
+
+      const q = (filter || '').toLowerCase().trim();
+
+      // Deduplicate: DATA.facilities has one row per facility-month;
+      // we only want one entry per unique facility name.
+      const seenFacilities = new Set();
+      const uniqueFacilities = DATA.facilities.filter(f => {
+        const key = f.facility;
+        if (seenFacilities.has(key)) return false;
+        seenFacilities.add(key);
+        return true;
+      });
+
+      // Build rows from deduplicated facility list
+      let rows = uniqueFacilities.map((f, idx) => ({
+        idx: idx + 1,
+        facility: f.facility,
+        block: f.sub_district,
+        ela: getFixedTarget(f.facility),
+        custom: modalStagedTargets[f.facility] !== undefined
+          ? modalStagedTargets[f.facility]
+          : getFixedTarget(f.facility)
+      }));
+
+      // Apply search filter
+      if (q) {
+        rows = rows.filter(r =>
+          r.facility.toLowerCase().includes(q) || r.block.toLowerCase().includes(q)
+        );
+      }
+
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="no-data" style="padding:2rem;">No facilities match your search.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map((r, i) => {
+        const diff = r.custom - r.ela;
+        const diffText = diff === 0 ? '=' : (diff > 0 ? `+${diff}` : `${diff}`);
+        const diffCls = diff === 0 ? '#10b981' : diff > 0 ? '#f59e0b' : '#ef4444';
+        const rowBg = (i % 2 === 0) ? '' : 'background:var(--color-background-secondary);';
+
+        return `<tr style="${rowBg}">
+          <td style="color:var(--color-text-tertiary); font-size:11px;">${r.idx}</td>
+          <td>
+            <div style="font-weight:700; font-size:13px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.facility}">${r.facility}</div>
+          </td>
+          <td><span class="pill pb" style="font-size:10px;">${r.block}</span></td>
+          <td style="text-align:right; font-weight:600; color:var(--color-text-secondary);">${r.ela}</td>
+          <td style="text-align:right;">
+            <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px;">
+              <div style="position:relative; width:115px;">
+                <input
+                  type="number"
+                  class="target-input modal-target-input"
+                  data-facility="${r.facility.replace(/"/g, '&quot;')}"
+                  value="${r.custom}"
+                  min="0"
+                  oninput="onModalInputChange(this)"
+                  style="width:100%; font-size:14px; padding:6px 10px; text-align:right; border-radius:var(--border-radius-sm); border:1.5px solid var(--color-border-secondary);"
+                >
+              </div>
+              <button class="modal-reset-btn" onclick="modalResetSingle('${r.facility.replace(/'/g, "\\'")}', this)" title="Reset to ELA target">
+                <i class="ti ti-refresh" style="font-size:11px;"></i>
+              </button>
+            </div>
+          </td>
+          <td style="text-align:right;">
+            <span class="pill" style="background:${diffCls}22; color:${diffCls}; border:1px solid ${diffCls}44; font-size:11px; font-weight:700;">${diffText}</span>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function onModalInputChange(inputEl) {
+      const facility = inputEl.dataset.facility;
+      let val = parseFloat(inputEl.value);
+      if (isNaN(val) || val < 0) val = 0;
+      modalStagedTargets[facility] = Math.round(val);
+      updateModalTotals();
+      updateModalRowDiff(inputEl, facility);
+    }
+    window.onModalInputChange = onModalInputChange;
+
+    function updateModalRowDiff(inputEl, facility) {
+      const ela    = getFixedTarget(facility);
+      const custom = modalStagedTargets[facility] !== undefined ? modalStagedTargets[facility] : ela;
+      const diff   = custom - ela;
+      const diffText = diff === 0 ? '=' : (diff > 0 ? `+${diff}` : `${diff}`);
+      const diffCls  = diff === 0 ? '#10b981' : diff > 0 ? '#f59e0b' : '#ef4444';
+      const td = inputEl.closest('tr').querySelector('td:last-child');
+      if (td) {
+        td.innerHTML = `<span class="pill" style="background:${diffCls}22; color:${diffCls}; border:1px solid ${diffCls}44; font-size:11px; font-weight:700;">${diffText}</span>`;
+      }
+    }
+
+    function getUniqueFacilities() {
+      const seen = new Set();
+      return DATA.facilities.filter(f => {
+        if (seen.has(f.facility)) return false;
+        seen.add(f.facility);
+        return true;
+      });
+    }
+
+    function modalResetSingle(facilityName, btn) {
+      const ela = getFixedTarget(facilityName);
+      modalStagedTargets[facilityName] = ela;
+      const input = btn.closest('tr').querySelector('.modal-target-input');
+      if (input) {
+        input.value = ela;
+        updateModalRowDiff(input, facilityName);
+      }
+      updateModalTotals();
+    }
+    window.modalResetSingle = modalResetSingle;
+
+    function updateModalTotals() {
+      const totalCustomEl = document.getElementById('modal-total-custom');
+      if (!totalCustomEl) return;
+      let total = 0;
+      getUniqueFacilities().forEach(f => {
+        const val = modalStagedTargets[f.facility] !== undefined
+          ? modalStagedTargets[f.facility]
+          : getFixedTarget(f.facility);
+        total += val;
+      });
+      totalCustomEl.textContent = total.toLocaleString();
+    }
+
+    function filterModalTable() {
+      const q = document.getElementById('modal-facility-search').value;
+      renderModalTable(q);
+    }
+    window.filterModalTable = filterModalTable;
+
+    function modalFillFromELA() {
+      getUniqueFacilities().forEach(f => {
+        modalStagedTargets[f.facility] = getFixedTarget(f.facility);
+      });
+      const q = document.getElementById('modal-facility-search')?.value || '';
+      renderModalTable(q);
+      updateModalTotals();
+      setModalStatus('All custom targets reset to ELA values.', 'success');
+    }
+    window.modalFillFromELA = modalFillFromELA;
+
+    function modalClearAll() {
+      if (!confirm('Set all custom targets to 0?')) return;
+      getUniqueFacilities().forEach(f => { modalStagedTargets[f.facility] = 0; });
+      const q = document.getElementById('modal-facility-search')?.value || '';
+      renderModalTable(q);
+      updateModalTotals();
+      setModalStatus('All custom targets cleared to 0.', 'warn');
+    }
+    window.modalClearAll = modalClearAll;
+
+    function saveTargetEditorChanges() {
+      Object.assign(customTargets, modalStagedTargets);
+      saveCustomTargets();
+      closeTargetEditor();
+      renderTable();
+      renderTargetAchievement();
+    }
+    window.saveTargetEditorChanges = saveTargetEditorChanges;
+
+    function exportTargetsCSV() {
+      const rows = ['Facility Name,Block,ELA Target,Custom Target'];
+      getUniqueFacilities().forEach(f => {
+        const ela    = getFixedTarget(f.facility);
+        const custom = modalStagedTargets[f.facility] !== undefined
+          ? modalStagedTargets[f.facility]
+          : (customTargets[f.facility] !== undefined ? customTargets[f.facility] : ela);
+        rows.push(`"${f.facility}","${f.sub_district}",${ela},${custom}`);
+      });
+      const link = document.createElement('a');
+      link.href     = 'data:text/csv;charset=utf-8,' + encodeURI(rows.join('\n'));
+      link.download = 'Custom_Targets_Bhagalpur.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setModalStatus('CSV exported successfully.', 'success');
+    }
+    window.exportTargetsCSV = exportTargetsCSV;
+
+    function importTargetsCSV(inputEl) {
+      const file = inputEl.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text  = e.target.result;
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) { setModalStatus('CSV appears empty or invalid.', 'error'); return; }
+
+        const header      = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+        const facilityIdx = header.findIndex(h => h.includes('facility'));
+        const customIdx   = header.findIndex(h => h.includes('custom'));
+
+        if (facilityIdx === -1 || customIdx === -1) {
+          setModalStatus('CSV must have "Facility Name" and "Custom Target" columns.', 'error');
+          inputEl.value = '';
+          return;
+        }
+
+        let imported = 0, skipped = 0;
+        lines.slice(1).forEach(line => {
+          const cols        = line.match(/(".*?"|[^,]+)/g) || [];
+          const facilityRaw = (cols[facilityIdx] || '').replace(/"/g, '').trim();
+          const customVal   = parseInt((cols[customIdx] || '').replace(/"/g, '').trim(), 10);
+          if (!facilityRaw || isNaN(customVal)) { skipped++; return; }
+          const matched = DATA.facilities.find(f =>
+            f.facility.replace(/\s+/g, ' ').trim().toLowerCase() ===
+            facilityRaw.replace(/\s+/g, ' ').trim().toLowerCase()
+          );
+          if (matched) { modalStagedTargets[matched.facility] = Math.max(0, customVal); imported++; }
+          else skipped++;
+        });
+
+        const q = document.getElementById('modal-facility-search')?.value || '';
+        renderModalTable(q);
+        updateModalTotals();
+        setModalStatus(
+          `Imported ${imported} facilities.${skipped > 0 ? ' ' + skipped + ' skipped.' : ''}`,
+          imported > 0 ? 'success' : 'warn'
+        );
+        inputEl.value = '';
+      };
+      reader.readAsText(file);
+    }
+    window.importTargetsCSV = importTargetsCSV;
+
+    function setModalStatus(msg, type) {
+      const el = document.getElementById('modal-status-msg');
+      if (!el) return;
+      const colors = { success: 'var(--color-success)', warn: 'var(--color-warning)', error: 'var(--color-danger)' };
+      el.textContent = msg;
+      el.style.color = colors[type] || 'var(--color-text-tertiary)';
+      setTimeout(() => { if (el) el.textContent = ''; }, 4000);
+    }
+
+    // ── Initialize Dashboard ─────────────────────────────────────────────────
     ensurePenta2Data();
     populateBlockFilter();
     setupFileUploader();
+    initializeCustomTargets();
     changeViewLevel('facility');
     renderKPIs();
-

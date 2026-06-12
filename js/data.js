@@ -12644,6 +12644,48 @@
   ]
 };
 
-    // Save default data for reset capability
-    const DEFAULT_DATA = JSON.stringify(DATA);
+// Save default data for reset capability
+const DEFAULT_DATA = JSON.stringify(DATA);
 
+// Fixed ELA Yearly Targets 2026-27 for Bhagalpur
+const FIXED_ELA_TARGETS = {
+  "Barari UPHC": 143,
+  "Bihpur CHC": 327,
+  "CHAMPANAGAR UPHC": 132,
+  "Gopalpur CHC": 252,
+  "Goradih PHC": 388,
+  "Hussainabad UPHC": 175,
+  "Ismailpur CHC": 115,
+  "Jagdishpur CHC": 402,
+  "Jawaharlal Nehru Medical College and Hospital Bgp": 0,
+  "Jawaharlal Nehru Medical College and Hospital  Bgp": 0,
+  "Kahalgaon PHC": 969,
+  "Kharik PHC": 353,
+  "LNJPN SADAR HOSPITAL BHAGALPUR": 0,
+  "Mohaddinagar UPHC": 163,
+  "Narayanpur PHC": 283,
+  "Nathnagar Budhiya UPHC": 136,
+  "Nathnagar CHC": 401,
+  "Naugachiya PHC": 410,
+  "Naya tola Sachchidanand Nagar UPHC": 128,
+  "Pirpainti CHC": 757,
+  "Rangra CHC": 240,
+  "Sabour CHC": 379,
+  "Sahebganj scheduled caste tola UPHC": 108,
+  "Sarai Kilaghat UPHC": 131,
+  "Shahkund CHC": 499,
+  "Sonhaula CHC": 511,
+  "Sultanganj CHC": 658
+};
+
+// Helper function to resolve target by normalized facility name
+function getFixedTarget(facilityName) {
+  if (!facilityName) return 0;
+  const normalized = facilityName.replace(/\s+/g, ' ').trim().toLowerCase();
+  for (const [key, value] of Object.entries(FIXED_ELA_TARGETS)) {
+    if (key.replace(/\s+/g, ' ').trim().toLowerCase() === normalized) {
+      return value;
+    }
+  }
+  return 0;
+}

@@ -131,6 +131,9 @@
               <th onclick="sortBy('mr2')">MR-2</th>
               <th onclick="sortBy('dropout_penta')">P1→P3 dropout</th>
               <th onclick="sortBy('dropout_mr')">MR dropout</th>
+              <th class="target-column" onclick="sortBy('target_fixed')" id="th-target-fixed">Fixed Target (ELA)</th>
+              <th class="target-column" id="th-target-custom">Custom Target</th>
+              <th class="target-column" onclick="sortBy('target_achievement')" id="th-target-achievement">Target Ach. %</th>
               <th>Grade</th>
             </tr>
           </thead>
@@ -141,8 +144,118 @@
       </div>
     </div>
 
+    <!-- Target Achievement Card -->
+    <div class="card" id="target-achievement-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px">
+        <div class="card-ttl" style="margin:0">
+          <i class="ti ti-target" style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Yearly Target Achievement (ELA 2026-27)
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="tb" id="btn-open-target-editor" onclick="openTargetEditor()" style="padding:4px 10px; font-size:12px; margin:0; background: var(--color-primary); color:#fff; border-color:var(--color-primary);"><i class="ti ti-pencil"></i> Set Facility Targets</button>
+          <button class="tb chart-dl-btn" onclick="downloadChart('c-target-achievement', 'Target_Achievement')" style="padding:4px 8px; font-size:11px; margin:0;"><i class="ti ti-download"></i> Download</button>
+        </div>
+      </div>
+      
+      <!-- Target Achievement Helper Alert for HSC View -->
+      <div id="target-hsc-alert" class="alert" style="display:none; margin-bottom: 1rem; background: var(--color-background-info); border-color: rgba(37,99,235,0.15); color: var(--color-text-info);">
+        <i class="ti ti-info-circle"></i>
+        <span>Yearly targets (ELA) are defined at the **Facility Level**. Switch to **Facility Level** at the top of the page to customize targets and view the achievement analysis.</span>
+      </div>
+
+      <!-- Controls Container -->
+      <div id="target-controls-container">
+        <!-- Target Selection Control Row -->
+        <div class="frow" style="margin-bottom:1.5rem; gap:16px;">
+          <!-- Target Source Toggle -->
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:11px; font-weight:700; color:var(--color-text-secondary); text-transform:uppercase;">Target Source</label>
+            <div class="tab-bar" style="margin:0; background: var(--color-border-primary); padding: 4px; border-radius: var(--border-radius-md); border: 1px solid var(--color-border-secondary);">
+              <button class="tb on" id="btn-target-source-fixed" onclick="changeTargetSource('fixed')" style="border: none; margin: 0; padding: 6px 12px;">Fixed ELA Target</button>
+              <button class="tb" id="btn-target-source-custom" onclick="changeTargetSource('custom')" style="border: none; margin: 0; padding: 6px 12px;">Custom Target</button>
+            </div>
+          </div>
+
+          <!-- Target Scale Toggle -->
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:11px; font-weight:700; color:var(--color-text-secondary); text-transform:uppercase;">Target Period Scale</label>
+            <div class="tab-bar" style="margin:0; background: var(--color-border-primary); padding: 4px; border-radius: var(--border-radius-md); border: 1px solid var(--color-border-secondary);">
+              <button class="tb" id="btn-target-period-yearly" onclick="changeTargetPeriod('yearly')" style="border: none; margin: 0; padding: 6px 12px;">Full Yearly</button>
+              <button class="tb on" id="btn-target-period-monthly" onclick="changeTargetPeriod('monthly')" style="border: none; margin: 0; padding: 6px 12px;">Pro-rata Monthly (Yearly/12)</button>
+            </div>
+          </div>
+
+          <!-- Comparison Metric Dropdown -->
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:11px; font-weight:700; color:var(--color-text-secondary); text-transform:uppercase;">Achievement Metric</label>
+            <select id="target-metric-select" onchange="onTargetMetricChange()" style="padding: 6px 12px; font-size:13px; font-weight:600; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-sm); outline: none; background: var(--color-background-primary);">
+              <option value="penta1" selected>Penta-1 Coverage</option>
+              <option value="bcg">BCG Coverage</option>
+              <option value="mr1">MR-1 Coverage</option>
+              <option value="infants">Infants (0-1y) Vaccinated</option>
+              <option value="total_beneficiaries">Total Beneficiaries</option>
+            </select>
+          </div>
+
+          <!-- Sort Chart Dropdown -->
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:11px; font-weight:700; color:var(--color-text-secondary); text-transform:uppercase;">Sort Chart By</label>
+            <select id="target-sort-select" onchange="onTargetSortChange()" style="padding: 6px 12px; font-size:13px; font-weight:600; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-sm); outline: none; background: var(--color-background-primary);">
+              <option value="rate_desc" selected>Achievement Rate (Highest ↓)</option>
+              <option value="rate_asc">Achievement Rate (Lowest ↑)</option>
+              <option value="name_asc">Facility Name (A-Z)</option>
+              <option value="target_desc">Target Volume (Highest ↓)</option>
+            </select>
+          </div>
+
+          <!-- Lock/Authorization Toggle -->
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:11px; font-weight:700; color:var(--color-text-secondary); text-transform:uppercase;">Authorization</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="tb" id="btn-target-lock" onclick="startUnlock()"><i class="ti ti-lock"></i> Locked</button>
+              <button class="tb on" id="btn-target-unlock" onclick="lockTargets()" style="display:none;"><i class="ti ti-lock-open"></i> Unlocked</button>
+              
+              <!-- Inline PIN entry box -->
+              <div id="target-unlock-box" style="display:none; align-items:center; gap:6px;">
+                <input type="password" id="target-passcode-input" placeholder="Enter PIN" onkeydown="if(event.key==='Enter') verifyTargetPasscode()" style="width:90px; font-size:13px; font-weight:600; padding:6px 10px; border:1px solid var(--color-border-secondary); border-radius:var(--border-radius-sm); outline:none; background: var(--color-background-primary); color: var(--color-text-primary);">
+                <button class="tb on" onclick="verifyTargetPasscode()" style="padding: 6px 10px;"><i class="ti ti-key"></i> Verify</button>
+                <button class="tb" onclick="cancelTargetUnlock()" style="padding: 6px 10px;">Cancel</button>
+              </div>
+
+              <!-- Reset/Change PIN (only visible when unlocked) -->
+              <button class="tb" id="btn-change-pin" onclick="changeTargetPIN()" style="display:none; padding:6px 10px;" title="Change PIN passcode"><i class="ti ti-settings"></i> Change PIN</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Target Specific KPIs -->
+        <div class="kpis" id="target-kpi-row" style="margin-bottom:1.5rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+          <!-- Will be rendered dynamically by JS -->
+        </div>
+
+        <!-- Target Chart Canvas -->
+        <div class="chart-outer-h" style="margin-bottom: 1.5rem;">
+          <div id="c-target-wrapper" class="chart-inner-h">
+            <canvas id="c-target-achievement" role="img" aria-label="Target Achievement Chart">Target Achievement Chart</canvas>
+          </div>
+        </div>
+
+        <!-- Custom Targets Bulk Editor Options (Only visible when Custom Target source is selected) -->
+        <div id="custom-target-bulk-editor" style="display:none; padding:12px 16px; background:var(--color-background-secondary); border-radius:var(--border-radius-md); border:1px solid var(--color-border-secondary); flex-wrap:wrap; gap:12px; align-items:center;">
+          <span style="font-size:12px; font-weight:700; color:var(--color-text-secondary);"><i class="ti ti-tool" style="margin-right:4px;"></i>Bulk Adjust Custom Targets:</span>
+          <button class="tb" onclick="adjustCustomTargetsBulk(1.1)"><i class="ti ti-trending-up"></i> +10% Target</button>
+          <button class="tb" onclick="adjustCustomTargetsBulk(0.9)"><i class="ti ti-trending-down"></i> -10% Target</button>
+          <button class="tb" onclick="resetCustomTargetsBulk()"><i class="ti ti-refresh"></i> Reset to ELA</button>
+          <div style="margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="number" id="bulk-multiplier-value" placeholder="e.g. 300" style="width:100px; font-size:13px; padding:6px 12px; border:1px solid var(--color-border-secondary); border-radius:var(--border-radius-sm); text-align:right;">
+            <button class="tb" onclick="setBulkCustomTargetsValue()"><i class="ti ti-check"></i> Set All</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Performance Chart (Full Width) -->
     <div class="card">
+
       <div
         style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
         <div class="card-ttl" id="chart-penta-title" style="margin:0"><i class="ti ti-chart-bar"
@@ -274,6 +387,78 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
+  <!-- Facility-wise Custom Target Editor Modal -->
+  <div id="target-editor-modal" class="modal-overlay" style="display:none;" onclick="onModalOverlayClick(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="modal-icon"><i class="ti ti-table-import"></i></div>
+          <div>
+            <div class="modal-title">Set Custom Targets — Facility Wise</div>
+            <div class="modal-subtitle">Edit individual facility targets. Changes are saved in-browser and persist across sessions.</div>
+          </div>
+        </div>
+        <button class="modal-close" onclick="closeTargetEditor()" title="Close"><i class="ti ti-x"></i></button>
+      </div>
+
+      <!-- Modal Toolbar -->
+      <div class="modal-toolbar">
+        <div style="display:flex; gap:8px; align-items:center; flex:1; flex-wrap:wrap;">
+          <div style="position:relative;">
+            <i class="ti ti-search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--color-text-tertiary); font-size:14px;"></i>
+            <input type="text" id="modal-facility-search" placeholder="Search facility..." oninput="filterModalTable()" style="padding:7px 10px 7px 32px; font-size:13px; border:1px solid var(--color-border-secondary); border-radius:var(--border-radius-sm); outline:none; width:220px; font-family:var(--font-sans);">
+          </div>
+          <button class="tb" onclick="modalFillFromELA()" style="font-size:12px;"><i class="ti ti-copy"></i> Fill from ELA</button>
+          <button class="tb" onclick="modalClearAll()" style="font-size:12px;"><i class="ti ti-eraser"></i> Clear All</button>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <label class="tb" for="modal-csv-import" title="Import targets from CSV file" style="cursor:pointer;">
+            <i class="ti ti-file-upload"></i> Import CSV
+            <input type="file" id="modal-csv-import" accept=".csv" style="display:none;" onchange="importTargetsCSV(this)">
+          </label>
+          <button class="tb" onclick="exportTargetsCSV()" title="Export current custom targets as CSV"><i class="ti ti-file-spreadsheet"></i> Export CSV</button>
+        </div>
+      </div>
+
+      <!-- Modal Legend -->
+      <div style="display:flex; gap:16px; padding:8px 22px 4px 22px; font-size:11px; color:var(--color-text-tertiary); font-weight:600; flex-wrap:wrap;">
+        <span><span class="ld" style="background:#10b981"></span>Custom = ELA</span>
+        <span><span class="ld" style="background:#f59e0b"></span>Custom &gt; ELA</span>
+        <span><span class="ld" style="background:#ef4444"></span>Custom &lt; ELA</span>
+        <span style="margin-left:auto;">Total custom: <strong id="modal-total-custom">—</strong> &nbsp;|&nbsp; ELA total: <strong id="modal-total-ela">8061</strong></span>
+      </div>
+
+      <!-- Modal Table -->
+      <div class="modal-table-scroll">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th style="width:28px;">#</th>
+              <th>Health Facility</th>
+              <th>Block</th>
+              <th style="text-align:right;">ELA Target</th>
+              <th style="text-align:right; min-width:140px;">Custom Target</th>
+              <th style="text-align:right;">Diff vs ELA</th>
+            </tr>
+          </thead>
+          <tbody id="modal-target-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer">
+        <div id="modal-status-msg" style="font-size:12px; color:var(--color-text-tertiary); font-weight:600;"></div>
+        <div style="display:flex; gap:10px;">
+          <button class="tb" onclick="closeTargetEditor()"><i class="ti ti-x"></i> Cancel</button>
+          <button class="tb on" onclick="saveTargetEditorChanges()" style="padding:8px 20px;"><i class="ti ti-device-floppy"></i> Save All Changes</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
   <script src="js/data.js"></script>
   <script src="js/dashboard.js"></script>
