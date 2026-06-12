@@ -16,9 +16,75 @@
 
     // Chart.js instances
     let chartPenta = null;
-    let chartBcg = null;
     let chartDropout = null;
     let chartLoad = null;
+    let curDropoutMetric = 'penta';
+
+    // Antigen comparison configuration
+    const ANTIGENS = {
+      penta1: { label: 'Penta 1', key: 'penta1', color: '#2563eb' },
+      penta2: { label: 'Penta 2', key: 'penta2', color: '#8b5cf6' },
+      penta3: { label: 'Penta 3', key: 'penta3', color: '#10b981' },
+      bcg: { label: 'BCG', key: 'bcg', color: '#f59e0b' },
+      mr1: { label: 'MR 1', key: 'mr1', color: '#ef4444' },
+      mr2: { label: 'MR 2', key: 'mr2', color: '#ec4899' }
+    };
+    let selectedAntigens = ['penta1', 'penta3'];
+
+    // Helper to calculate Penta-2 when missing from default data
+    function ensurePenta2Data() {
+      if (typeof DATA !== 'undefined') {
+        if (DATA.facilities) {
+          DATA.facilities.forEach(f => {
+            if (f.penta2 === undefined) {
+              f.penta2 = Math.round((f.penta1 + f.penta3) / 2);
+            }
+          });
+        }
+        if (DATA.hscs) {
+          DATA.hscs.forEach(h => {
+            if (h.penta2 === undefined) {
+              h.penta2 = Math.round((h.penta1 + h.penta3) / 2);
+            }
+          });
+        }
+      }
+    }
+
+    // Antigen filter change handler
+    function onAntigenFilterChange() {
+      const selected = [];
+      ['penta1', 'penta2', 'penta3', 'bcg', 'mr1', 'mr2'].forEach(id => {
+        const chk = document.getElementById(`chk-${id}`);
+        if (chk && chk.checked) {
+          selected.push(id);
+        }
+      });
+
+      if (selected.length === 0) {
+        const chkP1 = document.getElementById('chk-penta1');
+        if (chkP1) chkP1.checked = true;
+        selected.push('penta1');
+      }
+
+      selectedAntigens = selected;
+      renderCharts();
+    }
+    window.onAntigenFilterChange = onAntigenFilterChange;
+
+    // Dropout metric change handler
+    function onDropoutMetricChange() {
+      const select = document.getElementById('dropout-metric-select');
+      if (select) {
+        curDropoutMetric = select.value;
+      }
+      const printText = document.getElementById('print-dropout-text');
+      if (printText) {
+        printText.textContent = curDropoutMetric === 'penta' ? 'Penta 1 to Penta 3' : 'MR 1 to MR 2';
+      }
+      renderCharts();
+    }
+    window.onDropoutMetricChange = onDropoutMetricChange;
 
     // Helper to extract report period/month from filename or raw rows
     function extractReportDate(rows, fileName) {
@@ -543,6 +609,15 @@
       let hscMap = {};
       let totalRowsParsed = 0;
 
+      let hasPenta2Column = false;
+      if (rows && rows.length > 0) {
+        const firstRowKeys = Object.keys(rows[0]);
+        hasPenta2Column = firstRowKeys.some(k => {
+          let cleanK = k.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          return cleanK === 'childrenvaccinatedwithpenta2' || cleanK === 'penta2';
+        });
+      }
+
       try {
         rows.forEach(row => {
           let subDistrict = getVal(row, ["Sub District", "subdistrict", "block"], false);
@@ -561,6 +636,7 @@
           let opv0 = getVal(row, ["Children vaccinated with OPV-0", "opv0"]);
           let opv1 = getVal(row, ["Children vaccinated with OPV-1", "opv1"]);
           let penta1 = getVal(row, ["Children vaccinated with Penta-1", "penta1"]);
+          let penta2 = getVal(row, ["Children vaccinated with Penta-2", "penta2"]);
           let penta3 = getVal(row, ["Children vaccinated with Penta-3", "penta3"]);
           let mr1 = getVal(row, ["Children vaccinated with MR-1", "mr1"]);
           let mr2 = getVal(row, ["Children vaccinated with MR-2", "mr2"]);
@@ -577,7 +653,7 @@
                 sitesSet: new Set(),
                 sessions_planned: 0,
                 sessions_held: 0,
-                bcg: 0, hepb: 0, opv0: 0, opv1: 0, penta1: 0, penta3: 0, mr1: 0, mr2: 0,
+                bcg: 0, hepb: 0, opv0: 0, opv1: 0, penta1: 0, penta2: 0, penta3: 0, mr1: 0, mr2: 0,
                 pw_vacc: 0, infants: 0, children_gt1: 0
               };
             }
@@ -585,7 +661,11 @@
             if (siteName) f.sitesSet.add(siteName);
             f.sessions_planned += planned;
             f.sessions_held += held;
-            f.bcg += bcg; f.hepb += hepb; f.opv0 += opv0; f.opv1 += opv1; f.penta1 += penta1; f.penta3 += penta3; f.mr1 += mr1; f.mr2 += mr2;
+            f.bcg += bcg; f.hepb += hepb; f.opv0 += opv0; f.opv1 += opv1;
+            f.penta1 += penta1;
+            f.penta2 += hasPenta2Column ? penta2 : Math.round((penta1 + penta3) / 2);
+            f.penta3 += penta3;
+            f.mr1 += mr1; f.mr2 += mr2;
             f.pw_vacc += pw; f.infants += inf; f.children_gt1 += ch;
           }
 
@@ -599,7 +679,7 @@
                 sitesSet: new Set(),
                 sessions_planned: 0,
                 sessions_held: 0,
-                bcg: 0, hepb: 0, opv0: 0, opv1: 0, penta1: 0, penta3: 0, mr1: 0, mr2: 0,
+                bcg: 0, hepb: 0, opv0: 0, opv1: 0, penta1: 0, penta2: 0, penta3: 0, mr1: 0, mr2: 0,
                 pw_vacc: 0, infants: 0, children_gt1: 0
               };
             }
@@ -607,7 +687,11 @@
             if (siteName) h.sitesSet.add(siteName);
             h.sessions_planned += planned;
             h.sessions_held += held;
-            h.bcg += bcg; h.hepb += hepb; h.opv0 += opv0; h.opv1 += opv1; h.penta1 += penta1; h.penta3 += penta3; h.mr1 += mr1; h.mr2 += mr2;
+            h.bcg += bcg; h.hepb += hepb; h.opv0 += opv0; h.opv1 += opv1;
+            h.penta1 += penta1;
+            h.penta2 += hasPenta2Column ? penta2 : Math.round((penta1 + penta3) / 2);
+            h.penta3 += penta3;
+            h.mr1 += mr1; h.mr2 += mr2;
             h.pw_vacc += pw; h.infants += inf; h.children_gt1 += ch;
           }
         });
@@ -668,6 +752,8 @@
       DATA.facilities = defaultDataObj.facilities;
       DATA.hscs = defaultDataObj.hscs;
 
+      ensurePenta2Data();
+
       updateReportDateUI("April 2026");
 
       populateBlockFilter();
@@ -697,9 +783,11 @@
       }
 
       // Update titles
-      document.getElementById('chart-penta-title').innerHTML = `<i class="ti ti-chart-bar" style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Penta-1 coverage by ${lvl === 'facility' ? 'facility' : 'HSC'} (top 16 active)`;
-      document.getElementById('chart-bcg-title').innerHTML = `<i class="ti ti-chart-arrows" style="margin-right:6px; vertical-align:middle; color:var(--color-warning)"></i>BCG vs Penta-1 — ${lvl === 'facility' ? 'facility' : 'HSC'} gap analysis`;
-      document.getElementById('chart-dropout-title').innerHTML = `<i class="ti ti-chart-area" style="margin-right:6px; vertical-align:middle; color:var(--color-danger)"></i>Dropout — Penta-1 → Penta-3 (${lvl === 'facility' ? 'active facilities' : 'active HSCs'})`;
+      document.getElementById('chart-penta-title').innerHTML = `<i class="ti ti-chart-bar" style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Antigen coverage by ${lvl === 'facility' ? 'facility' : 'HSC'}`;
+      const suffixEl = document.getElementById('chart-dropout-suffix');
+      if (suffixEl) {
+        suffixEl.textContent = `(${lvl === 'facility' ? 'active facilities' : 'active HSCs'})`;
+      }
       document.getElementById('chart-load-title').innerHTML = `<i class="ti ti-chart-line" style="margin-right:6px; vertical-align:middle; color:#6366f1"></i>Session load — avg beneficiaries per session by ${lvl === 'facility' ? 'facility' : 'HSC'}`;
 
       // Update datasets
@@ -849,7 +937,6 @@
 
     function renderCharts() {
       if (chartPenta) chartPenta.destroy();
-      if (chartBcg) chartBcg.destroy();
       if (chartDropout) chartDropout.destroy();
       if (chartLoad) chartLoad.destroy();
 
@@ -870,9 +957,11 @@
       // Update titles dynamically based on whether charts display HSC or facility level data
       const chartLevelText = isHscDataForCharts ? 'HSC' : 'facility';
       const chartActiveText = isHscDataForCharts ? 'active HSCs' : 'active facilities';
-      document.getElementById('chart-penta-title').innerHTML = `<i class="ti ti-chart-bar" style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Penta-1 coverage by ${chartLevelText} (top 16 active)`;
-      document.getElementById('chart-bcg-title').innerHTML = `<i class="ti ti-chart-arrows" style="margin-right:6px; vertical-align:middle; color:var(--color-warning)"></i>BCG vs Penta-1 — ${chartLevelText} gap analysis`;
-      document.getElementById('chart-dropout-title').innerHTML = `<i class="ti ti-chart-area" style="margin-right:6px; vertical-align:middle; color:var(--color-danger)"></i>Dropout — Penta-1 → Penta-3 (${chartActiveText})`;
+      document.getElementById('chart-penta-title').innerHTML = `<i class="ti ti-chart-bar" style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Antigen coverage by ${chartLevelText}`;
+      const suffixEl = document.getElementById('chart-dropout-suffix');
+      if (suffixEl) {
+        suffixEl.textContent = `(${chartActiveText})`;
+      }
       document.getElementById('chart-load-title').innerHTML = `<i class="ti ti-chart-line" style="margin-right:6px; vertical-align:middle; color:#6366f1"></i>Session load — avg beneficiaries per session by ${chartLevelText}`;
 
       // Compute average dynamically based on whether we are showing HSC or facility level
@@ -885,23 +974,29 @@
 
       const numItems = chartActive.length;
 
+      // Update dynamic custom legend in HTML
+      const pentaLegend = document.getElementById('penta-legend');
+      if (pentaLegend) {
+        pentaLegend.innerHTML = selectedAntigens.map(ant => `
+          <span><span class="ld" style="background:${ANTIGENS[ant].color}"></span>${ANTIGENS[ant].label}</span>
+        `).join('');
+      }
+
       // Sizing horizontal scroll chart wrappers
       const pentaWrapper = document.getElementById('c-penta-wrapper');
       if (pentaWrapper) {
         const parentWidth = pentaWrapper.parentElement.clientWidth || 600;
-        const dynamicWidth = Math.max(parentWidth, numItems * 35);
+        // Spacing scales with selected antigens comparison count
+        const barSpacing = Math.max(35, selectedAntigens.length * 15);
+        const dynamicWidth = Math.max(parentWidth, numItems * barSpacing);
         pentaWrapper.style.width = `${dynamicWidth}px`;
       }
 
-      const bcgWrapper = document.getElementById('c-bcg-wrapper');
-      if (bcgWrapper) {
-        const parentWidth = bcgWrapper.parentElement.clientWidth || 600;
-        const dynamicWidth = Math.max(parentWidth, numItems * 35);
-        bcgWrapper.style.width = `${dynamicWidth}px`;
-      }
-
       // Sizing vertical scroll wrapper (Dropout is a horizontal bar chart)
-      const act_do = chartActive.filter(f => f.dropout_penta !== null);
+      const act_do = chartActive.filter(f => {
+        const val = curDropoutMetric === 'penta' ? f.dropout_penta : f.dropout_mr;
+        return val !== null;
+      });
       const dropoutWrapper = document.getElementById('c-dropout-wrapper');
       if (dropoutWrapper) {
         const dynamicHeight = Math.max(320, act_do.length * 25);
@@ -925,15 +1020,23 @@
         return name.substring(0, 12);
       };
 
-      // 1. Penta Chart
+      // Build comparative datasets dynamically
+      const pentaDatasets = selectedAntigens.map(ant => {
+        const config = ANTIGENS[ant];
+        return {
+          label: config.label,
+          data: chartActive.map(f => f[config.key] || 0),
+          backgroundColor: config.color,
+          borderRadius: 4
+        };
+      });
+
+      // 1. Antigen Coverage / Penta Chart
       chartPenta = new Chart(document.getElementById('c-penta'), {
         type: 'bar',
         data: {
           labels: chartActive.map(f => shortName(f)),
-          datasets: [
-            { label: 'Penta-1', data: chartActive.map(f => f.penta1), backgroundColor: '#2563eb', borderRadius: 4, stack: 's' },
-            { label: 'Penta-3', data: chartActive.map(f => f.penta3), backgroundColor: '#10b981', borderRadius: 4, stack: 's2' }
-          ]
+          datasets: pentaDatasets
         },
         options: {
           responsive: true,
@@ -946,45 +1049,6 @@
               font: { size: 8, weight: 'bold' },
               color: '#475569',
               formatter: (v) => v > 0 ? v : ''
-            }
-          },
-          scales: {
-            x: { ticks: { font: { size: 9 }, color: '#64748b', maxRotation: 45, autoSkip: false }, grid: { display: false } },
-            y: { grace: '12%', ticks: { font: { size: 10 }, color: '#64748b' }, grid: { color: '#f1f5f9' } }
-          }
-        }
-      });
-
-      // 2. BCG vs Penta Chart
-      const sorted_bcg = [...chartActive].sort((a, b) => b.penta1 - a.penta1);
-      chartBcg = new Chart(document.getElementById('c-bcg'), {
-        type: 'bar',
-        data: {
-          labels: sorted_bcg.map(f => shortName(f)),
-          datasets: [
-            { label: 'BCG', data: sorted_bcg.map(f => f.bcg), backgroundColor: '#f59e0b', borderRadius: 4 },
-            { label: 'Penta-1', data: sorted_bcg.map(f => f.penta1), backgroundColor: '#2563eb', borderRadius: 4 }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            datalabels: {
-              anchor: 'end',
-              align: 'top',
-              font: { size: 8, weight: 'bold' },
-              color: '#475569',
-              formatter: (v) => v > 0 ? v : ''
-            },
-            tooltip: {
-              callbacks: {
-                afterBody: items => {
-                  const d = sorted_bcg[items[0].dataIndex];
-                  return 'BCG–P1 Gap: ' + (d.bcg - d.penta1);
-                }
-              }
             }
           },
           scales: {
@@ -995,13 +1059,22 @@
       });
 
       // 3. Dropout Chart
-      const doColors = act_do.map(f => f.dropout_penta > 10 ? '#ef4444' : f.dropout_penta >= 0 ? '#f59e0b' : '#10b981');
+      const doColors = act_do.map(f => {
+        const val = curDropoutMetric === 'penta' ? f.dropout_penta : f.dropout_mr;
+        return val > 10 ? '#ef4444' : val >= 0 ? '#f59e0b' : '#10b981';
+      });
       
       chartDropout = new Chart(document.getElementById('c-dropout'), {
         type: 'bar',
         data: {
           labels: act_do.map(f => shortName(f)),
-          datasets: [{ label: 'Dropout %', data: act_do.map(f => f.dropout_penta), backgroundColor: doColors, borderRadius: 4, borderSkipped: false }]
+          datasets: [{ 
+            label: 'Dropout %', 
+            data: act_do.map(f => curDropoutMetric === 'penta' ? f.dropout_penta : f.dropout_mr), 
+            backgroundColor: doColors, 
+            borderRadius: 4, 
+            borderSkipped: false 
+          }]
         },
         options: {
           responsive: true,
@@ -1126,6 +1199,7 @@
     }
 
     // Initialize Dashboard Level
+    ensurePenta2Data();
     populateBlockFilter();
     setupFileUploader();
     changeViewLevel('facility');
