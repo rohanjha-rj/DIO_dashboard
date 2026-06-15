@@ -27,7 +27,7 @@ Chart.register(ChartDataLabels);
     let targetSortMode = 'rate_desc'; // 'rate_desc', 'rate_asc', 'name_asc', 'target_desc'
     let customTargets = {};
     let chartTargetAchievement = null;
-    let customTargetsLocked = true;
+    let customTargetsLocked = false;
 
     // Antigen comparison configuration
     const ANTIGENS = {
@@ -1348,11 +1348,6 @@ Chart.register(ChartDataLabels);
     window.onTargetSortChange = onTargetSortChange;
 
     function updateCustomTarget(facilityName, value) {
-      if (customTargetsLocked) {
-        alert("Editing is locked. Please unlock first using your passcode.");
-        renderTable();
-        return;
-      }
       let numVal = parseFloat(value);
       if (isNaN(numVal) || numVal < 0) numVal = 0;
       customTargets[facilityName] = Math.round(numVal);
@@ -1364,10 +1359,6 @@ Chart.register(ChartDataLabels);
     window.updateCustomTarget = updateCustomTarget;
 
     function adjustCustomTargetsBulk(factor) {
-      if (customTargetsLocked) {
-        alert("Editing is locked. Please unlock first using your passcode.");
-        return;
-      }
       for (let key in customTargets) {
         let currentTarget = customTargets[key];
         customTargets[key] = Math.round(currentTarget * factor);
@@ -1379,10 +1370,6 @@ Chart.register(ChartDataLabels);
     window.adjustCustomTargetsBulk = adjustCustomTargetsBulk;
 
     function resetCustomTargetsBulk() {
-      if (customTargetsLocked) {
-        alert("Editing is locked. Please unlock first using your passcode.");
-        return;
-      }
       if (typeof DATA !== 'undefined' && DATA.facilities) {
         DATA.facilities.forEach(f => {
           customTargets[f.facility] = getFixedTarget(f.facility);
@@ -1395,10 +1382,6 @@ Chart.register(ChartDataLabels);
     window.resetCustomTargetsBulk = resetCustomTargetsBulk;
 
     function setBulkCustomTargetsValue() {
-      if (customTargetsLocked) {
-        alert("Editing is locked. Please unlock first using your passcode.");
-        return;
-      }
       const valInput = document.getElementById('bulk-multiplier-value');
       if (!valInput) return;
       let val = parseFloat(valInput.value);
@@ -1413,102 +1396,6 @@ Chart.register(ChartDataLabels);
       renderTargetAchievement();
     }
     window.setBulkCustomTargetsValue = setBulkCustomTargetsValue;
-
-    // PIN lock / unlock state management functions
-    const DEFAULT_PIN = "2026"; // Default passcode matching yearly ELA targets year
-
-    function getTargetPIN() {
-      return localStorage.getItem('bhagalpur_targets_lock_pwd') || DEFAULT_PIN;
-    }
-
-    function startUnlock() {
-      document.getElementById('btn-target-lock').style.display = 'none';
-      document.getElementById('target-unlock-box').style.display = 'inline-flex';
-      
-      const pinInput = document.getElementById('target-passcode-input');
-      if (pinInput) {
-        pinInput.value = '';
-        pinInput.focus();
-      }
-    }
-    window.startUnlock = startUnlock;
-
-    function cancelTargetUnlock() {
-      document.getElementById('target-unlock-box').style.display = 'none';
-      document.getElementById('btn-target-lock').style.display = 'inline-flex';
-    }
-    window.cancelTargetUnlock = cancelTargetUnlock;
-
-    function verifyTargetPasscode() {
-      const pinInput = document.getElementById('target-passcode-input');
-      if (!pinInput) return;
-      
-      const enteredPIN = pinInput.value.trim();
-      const currentPIN = getTargetPIN();
-      
-      if (enteredPIN === currentPIN) {
-        customTargetsLocked = false;
-        
-        // Update UI buttons
-        document.getElementById('target-unlock-box').style.display = 'none';
-        document.getElementById('btn-target-lock').style.display = 'none';
-        document.getElementById('btn-target-unlock').style.display = 'inline-flex';
-        
-        // Show change PIN settings button
-        const changePinBtn = document.getElementById('btn-change-pin');
-        if (changePinBtn) changePinBtn.style.display = 'inline-flex';
-        
-        // Refresh table to enable inputs
-        renderTable();
-      } else {
-        alert("Incorrect PIN passcode. Access denied.");
-        pinInput.value = '';
-        pinInput.focus();
-      }
-    }
-    window.verifyTargetPasscode = verifyTargetPasscode;
-
-    function lockTargets() {
-      customTargetsLocked = true;
-      
-      // Update UI buttons
-      document.getElementById('btn-target-unlock').style.display = 'none';
-      document.getElementById('btn-change-pin').style.display = 'none';
-      document.getElementById('btn-target-lock').style.display = 'inline-flex';
-      
-      // Refresh table to disable inputs
-      renderTable();
-    }
-    window.lockTargets = lockTargets;
-
-    function changeTargetPIN() {
-      if (customTargetsLocked) return;
-      
-      const currentPIN = getTargetPIN();
-      const oldPIN = prompt("To change your PIN, first enter your current PIN:");
-      if (oldPIN === null) return; // cancelled
-      
-      if (oldPIN !== currentPIN) {
-        alert("Incorrect current PIN.");
-        return;
-      }
-      
-      const newPIN1 = prompt("Enter new PIN:");
-      if (!newPIN1) {
-        alert("PIN cannot be empty.");
-        return;
-      }
-      
-      const newPIN2 = prompt("Confirm new PIN:");
-      if (newPIN1 !== newPIN2) {
-        alert("New PINs do not match.");
-        return;
-      }
-      
-      localStorage.setItem('bhagalpur_targets_lock_pwd', newPIN1);
-      alert("PIN passcode changed successfully!");
-    }
-    window.changeTargetPIN = changeTargetPIN;
 
 
     function renderTargetAchievement() {
@@ -1697,20 +1584,6 @@ Chart.register(ChartDataLabels);
     let modalStagedTargets = {};
 
     function openTargetEditor() {
-      if (customTargetsLocked) {
-        // Auto-trigger the unlock flow so the user doesn't have to find the lock button manually
-        startUnlock();
-        const lockSection = document.getElementById('btn-target-lock');
-        if (lockSection) lockSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Show a non-blocking tooltip-style hint
-        const hint = document.createElement('div');
-        hint.textContent = '🔐 Enter your PIN to edit facility targets';
-        hint.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f8fafc;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:2000;box-shadow:0 4px 16px rgba(0,0,0,0.3);animation:modalFadeIn 0.2s ease;';
-        document.body.appendChild(hint);
-        setTimeout(() => hint.remove(), 3000);
-        return;
-      }
-
       // Deep-copy current custom targets into the staging object
       modalStagedTargets = Object.assign({}, customTargets);
 

@@ -207,24 +207,7 @@
             </select>
           </div>
 
-          <!-- Lock/Authorization Toggle -->
-          <div style="display:flex; flex-direction:column; gap:4px;">
-            <label style="font-size:11px; font-weight:700; color:var(--color-text-secondary); text-transform:uppercase;">Authorization</label>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <button class="tb" id="btn-target-lock" onclick="startUnlock()"><i class="ti ti-lock"></i> Locked</button>
-              <button class="tb on" id="btn-target-unlock" onclick="lockTargets()" style="display:none;"><i class="ti ti-lock-open"></i> Unlocked</button>
-              
-              <!-- Inline PIN entry box -->
-              <div id="target-unlock-box" style="display:none; align-items:center; gap:6px;">
-                <input type="password" id="target-passcode-input" placeholder="Enter PIN" onkeydown="if(event.key==='Enter') verifyTargetPasscode()" style="width:90px; font-size:13px; font-weight:600; padding:6px 10px; border:1px solid var(--color-border-secondary); border-radius:var(--border-radius-sm); outline:none; background: var(--color-background-primary); color: var(--color-text-primary);">
-                <button class="tb on" onclick="verifyTargetPasscode()" style="padding: 6px 10px;"><i class="ti ti-key"></i> Verify</button>
-                <button class="tb" onclick="cancelTargetUnlock()" style="padding: 6px 10px;">Cancel</button>
-              </div>
 
-              <!-- Reset/Change PIN (only visible when unlocked) -->
-              <button class="tb" id="btn-change-pin" onclick="changeTargetPIN()" style="display:none; padding:6px 10px;" title="Change PIN passcode"><i class="ti ti-settings"></i> Change PIN</button>
-            </div>
-          </div>
         </div>
 
         <!-- Target Specific KPIs -->
