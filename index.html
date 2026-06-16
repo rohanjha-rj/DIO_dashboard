@@ -131,10 +131,6 @@
               <th onclick="sortBy('mr2')">MR-2</th>
               <th onclick="sortBy('dropout_penta')">P1→P3 dropout</th>
               <th onclick="sortBy('dropout_mr')">MR dropout</th>
-              <th class="target-column" onclick="sortBy('target_fixed')" id="th-target-fixed">Fixed Target (ELA)</th>
-              <th class="target-column" id="th-target-custom">Custom Target</th>
-              <th class="target-column" onclick="sortBy('target_achievement')" id="th-target-achievement">Target Ach. %</th>
-              <th>Grade</th>
             </tr>
           </thead>
           <tbody id="fac-body"></tbody>
@@ -323,13 +319,38 @@
       <div class="card" style="margin:0">
         <div
           style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-          <div class="card-ttl" id="chart-load-title" style="margin:0"><i class="ti ti-chart-line"
-              style="margin-right:6px; vertical-align:middle; color:#6366f1"></i>Session load — avg beneficiaries per
-            session</div>
-          <button class="tb chart-dl-btn" onclick="downloadChart('c-load', 'Session_load_avg')"
+          <div class="card-ttl" id="chart-load-title" style="margin:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <i class="ti ti-chart-line" style="margin-right:6px; vertical-align:middle; color:#6366f1"></i>
+            <span>Session load —</span>
+            <select id="load-chart-view-select" onchange="onLoadChartViewChange()"
+              style="font-family: var(--font-sans); font-size: 13px; font-weight: 600; padding: 4px 8px; border-radius: var(--border-radius-sm); border: 1px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); outline: none;">
+              <option value="avg_load">Avg beneficiaries per session</option>
+              <option value="session_distribution">Session site vaccination distribution</option>
+            </select>
+            <span id="chart-load-level-suffix" style="font-size:12px; color:var(--color-text-tertiary); font-weight:600;">(by facility)</span>
+          </div>
+          <button class="tb chart-dl-btn" onclick="downloadChart('c-load', document.getElementById('load-chart-view-select').value === 'avg_load' ? 'Session_load_avg' : 'Session_site_vaccination_distribution')"
             style="padding:4px 8px; font-size:11px; margin:0;"><i class="ti ti-download"></i> Download</button>
         </div>
-        <div class="lgd">
+
+        <!-- Session Site Distribution Filters (only visible when session_distribution is selected) -->
+        <div id="session-dist-filters" class="antigen-filters" style="display: none; margin-top: 8px; margin-bottom: 12px; border-color: rgba(99, 102, 241, 0.15);">
+          <span class="filters-lbl" style="color: #6366f1;">Filter Categories:</span>
+          <label class="antigen-chip" style="--ant-color: #ef4444;">
+            <input type="checkbox" id="chk-bucket0" value="0" checked onchange="renderCharts()">
+            <span>0 Vaccinations</span>
+          </label>
+          <label class="antigen-chip" style="--ant-color: #f59e0b;">
+            <input type="checkbox" id="chk-bucket1" value="1" checked onchange="renderCharts()">
+            <span>1 to 5 Vaccinations</span>
+          </label>
+          <label class="antigen-chip" style="--ant-color: #10b981;">
+            <input type="checkbox" id="chk-bucket2" value="2" checked onchange="renderCharts()">
+            <span>6 or More Vaccinations</span>
+          </label>
+        </div>
+
+        <div class="lgd" id="load-chart-legend">
           <span><span class="ld" style="background:#6366f1"></span>Avg/session</span>
           <span style="color:var(--color-text-tertiary); font-size:11px; margin-left:auto;"
             id="district-avg-label">District avg: 13.9</span>
@@ -338,6 +359,44 @@
           <div id="c-load-wrapper" class="chart-inner-h">
             <canvas id="c-load" role="img" aria-label="Load chart">Load chart</canvas>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delivery Point Performance Card -->
+    <div class="card" id="delivery-performance-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px">
+        <div class="card-ttl" style="margin:0">
+          <i class="ti ti-truck-delivery" style="margin-right:6px; vertical-align:middle; color:var(--color-primary)"></i>Delivery Point Performance Analysis
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="tb chart-dl-btn" onclick="downloadChart('c-delivery', 'Delivery_Point_Performance')" style="padding:4px 8px; font-size:11px; margin:0;"><i class="ti ti-download"></i> Download</button>
+        </div>
+      </div>
+      
+      <!-- Controls for Delivery Chart -->
+      <div class="frow" style="margin-bottom:1.5rem; gap:16px;">
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:11px; font-weight:700; color:var(--color-text-secondary); text-transform:uppercase;">Sort Chart By</label>
+          <select id="delivery-sort-select" onchange="onDeliverySortChange()" style="padding: 6px 12px; font-size:13px; font-weight:600; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-sm); outline: none; background: var(--color-background-primary);">
+            <option value="delivery_desc" selected>Deliveries (Highest ↓)</option>
+            <option value="live_birth_desc">Live Births (Highest ↓)</option>
+            <option value="doses_desc">Birth Doses Updated (Highest ↓)</option>
+            <option value="name_asc">Delivery Point (A-Z)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="lgd" id="delivery-legend">
+        <span><span class="ld" style="background:#4f46e5"></span>Pregnancy Outcome Registered - Delivery</span>
+        <span><span class="ld" style="background:#10b981"></span>New Born Registered - Live Birth</span>
+        <span><span class="ld" style="background:#f59e0b"></span>Birth Doses Updated</span>
+      </div>
+
+      <!-- Delivery Chart Canvas -->
+      <div class="chart-outer-h">
+        <div id="c-delivery-wrapper" class="chart-inner-h">
+          <canvas id="c-delivery" role="img" aria-label="Delivery Point Performance Chart">Delivery Point Performance Chart</canvas>
         </div>
       </div>
     </div>
